@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+sistema_aulas_original/
+backup_pre_cuiag/
+scratch/
+.system_generated/
+*.db
+

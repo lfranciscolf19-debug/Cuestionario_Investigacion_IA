@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cuestionario CUIAG-CIS | FACSA - UJED</title>
+  <meta name="description" content="Cuestionario de Uso de Inteligencia Artificial Generativa y Competencias Investigativas en Salud (CUIAG-CIS) - Facultad de Ciencias de la Salud, UJED.">
+  
+  <!-- Tipografía Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Estilos del Cuestionario e Identidad Institucional -->
+  <link rel="stylesheet" href="css/cuiag.css?v=2">
+  <style>
+    :root {
+      --bg-main: #0b0f19;
+      --card-bg: #1e293b;
+      --bg-secondary: #0f172a;
+      --border-color: rgba(255, 255, 255, 0.1);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --accent-gold: #c9a227;
+      --accent-crimson: #7f1d1d;
+      --med-color: #38bdf8;
+      --psi-color: #a855f7;
+      --nut-color: #4ade80;
+    }
+
+    [data-theme="light"] {
+      --bg-main: #f1f5f9;
+      --card-bg: #ffffff;
+      --bg-secondary: #f8fafc;
+      --border-color: rgba(0, 0, 0, 0.1);
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --text-dim: #94a3b8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: var(--bg-main);
+      color: var(--text-main);
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      transition: background-color 0.25s, color 0.25s;
+    }
+
+    /* Barra Superior Institucional */
+    .cuiag-app-header {
+      background: rgba(15, 23, 42, 0.9);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 0.75rem 1.8rem;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .header-brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      cursor: pointer;
+    }
+
+    .header-brand img {
+      height: 44px;
+      width: auto;
+      object-fit: contain;
+    }
+
+    .header-brand-title {
+      font-size: 1.2rem;
+      font-weight: 800;
+      color: #ffffff;
+      letter-spacing: -0.3px;
+    }
+
+    .header-brand-subtitle {
+      font-size: 0.76rem;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Navegación por Pestañas Principales */
+    .header-nav-tabs {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(0, 0, 0, 0.25);
+      padding: 4px;
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+    }
+
+    .header-tab-btn {
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 0.86rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .header-tab-btn:hover {
+      color: var(--text-main);
+    }
+
+    .header-tab-btn.active {
+      background: var(--card-bg);
+      color: #fbbf24;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn-toggle-theme {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    /* Contenedor Principal de Vistas */
+    .cuiag-main-viewport {
+      flex: 1;
+      width: 100%;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 1.5rem 1rem 3rem;
+    }
+
+    .view-panel {
+      display: none;
+      animation: cuiagFadeIn 0.3s ease-out;
+    }
+
+    .view-panel.active {
+      display: block;
+    }
+
+    /* Modal / Candado de Seguridad para Panel Administrativo */
+    .admin-auth-card {
+      max-width: 460px;
+      margin: 3rem auto;
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 18px;
+      padding: 2.2rem 2rem;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.25);
+      text-align: center;
+    }
+
+    .admin-auth-icon {
+      font-size: 3rem;
+      margin-bottom: 0.8rem;
+    }
+
+    .admin-auth-title {
+      font-size: 1.4rem;
+      font-weight: 800;
+      margin-bottom: 6px;
+      color: var(--text-main);
+    }
+
+    .admin-auth-desc {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 1.5rem;
+      line-height: 1.5;
+    }
+
+    .custom-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      border-radius: 10px;
+      overflow: hidden;
+      margin-top: 10px;
+    }
+
+    .custom-table th {
+      background: var(--bg-secondary);
+      color: var(--text-muted);
+      padding: 10px 14px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .custom-table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border-color);
+      color: var(--text-main);
+      font-size: 0.86rem;
+    }
+
+    .custom-table tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+
+    /* Pie de página */
+    .cuiag-page-footer {
+      margin-top: auto;
+      background: rgba(15, 23, 42, 0.75);
+      border-top: 1px solid var(--border-color);
+      padding: 1.2rem 1.8rem;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .footer-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    /* Notificaciones Toast */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .toast-item {
+      background: #1e293b;
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 12px 18px;
+      border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      font-size: 0.88rem;
+      font-weight: 600;
+      animation: cuiagFadeIn 0.25s ease-out;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- CABECERA INSTITUCIONAL DEL CUESTIONARIO -->
+  <header class="cuiag-app-header">
+    <div class="header-brand">
+      <img src="img/logo-facsa.png" alt="Logo FACSA UJED">
+      <div>
+        <div class="header-brand-title">Cuestionario CUIAG-CIS</div>
+        <div class="header-brand-subtitle">
+          <span>Facultad de Ciencias de la Salud</span>
+          <span>•</span>
+          <span style="color: #fbbf24;">UJED</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <button type="button" class="btn-toggle-theme" id="btnToggleTheme" onclick="alternarTemaVisual()">
+        ☀️ Día
+      </button>
+    </div>
+  </header>
+
+  <!-- CONTENIDO PRINCIPAL: CUESTIONARIO PARA ESTUDIANTES -->
+  <main class="cuiag-main-viewport">
+    <section class="view-panel active" id="view-cuestionario">
+      <div id="moduloCuestionarioCUIAG" style="display: block;">
+        <div class="cuiag-module-container">
+          <!-- HÉROE INSTITUCIONAL -->
+          <div class="cuiag-hero-card">
+            <div class="cuiag-institution-badge">
+              🏛️ FACSA · UJED • Protocolo de Investigación
+            </div>
+            <h1 class="cuiag-hero-title">Cuestionario CUIAG-CIS</h1>
+            <p class="cuiag-hero-subtitle">
+              Uso de inteligencia artificial generativa y competencias investigativas en estudiantes del área de la salud.
+            </p>
+            <div class="cuiag-privacy-notice-badge">
+              🔒 Participación 100% Voluntaria y Anónima (Sin matrícula ni datos personales)
+            </div>
+          </div>
+
+          <!-- STEPPER / BARRA DE PROGRESO -->
+          <div class="cuiag-stepper-wrapper" id="cuiagStepperBox">
+            <div class="cuiag-progress-header">
+              <span class="cuiag-progress-step-name" id="cuiagStepNameLabel">
+                📍 Paso 1 de 10: Presentación y Propósito
+              </span>
+              <span class="cuiag-progress-percent" id="cuiagProgressPercentLabel">0%</span>
+            </div>
+            <div class="cuiag-progress-track">
+              <div class="cuiag-progress-fill" id="cuiagProgressBarFill" style="width: 0%;"></div>
+            </div>
+            <div class="cuiag-steps-pills" id="cuiagStepsPillsStrip"></div>
+          </div>
+
+          <!-- CONTENEDOR DINÁMICO DE PASOS -->
+          <div id="cuiagDynamicStepsContainer">
+            <div class="cuiag-section-card active">
+              <div class="cuiag-section-header">
+                <div class="cuiag-section-badge">Protocolo de Investigación Académica</div>
+                <h2 class="cuiag-section-title">Bienvenido(a) a la Evaluación CUIAG-CIS</h2>
+                <p class="cuiag-section-desc">
+                  Facultad de Ciencias de la Salud • Universidad Juárez del Estado de Durango
+                </p>
+              </div>
+
+              <div style="font-size: 0.98rem; line-height: 1.7; color: var(--text-main); margin-bottom: 2rem;">
+                <p>
+                  El presente estudio tiene como objetivo evaluar el <strong>Uso de Inteligencia Artificial Generativa y Competencias Investigativas en Salud</strong> en estudiantes de último semestre de las licenciaturas de <strong>Medicina, Psicología y Nutrición</strong> de la FACSA-UJED.
+                </p>
+                <div style="background: rgba(201, 162, 39, 0.1); border: 1px solid rgba(201, 162, 39, 0.35); border-radius: 12px; padding: 1.2rem; margin: 1.4rem 0;">
+                  <h4 style="margin: 0 0 6px 0; color: #fbbf24; font-size: 1rem;">🛡️ Compromiso de Privacidad y Anonimato Estricto</h4>
+                  <ul style="margin: 0; padding-left: 1.2rem; font-size: 0.9rem; color: var(--text-main);">
+                    <li><strong>No se solicita su nombre, matrícula ni correo electrónico</strong> en ninguna parte del instrumento.</li>
+                    <li>Sus respuestas serán procesadas con fines exclusivamente académicos y estadísticos.</li>
+                    <li>El cuestionario consta de datos sociodemográficos y <strong>40 reactivos</strong> distribuidos en seis dimensiones.</li>
+                    <li>Tiempo estimado de llenado: <strong>8 a 10 minutos</strong>.</li>
+                  </ul>
+                </div>
+                <p style="font-size: 0.88rem; color: var(--text-muted);">
+                  <em>Nota técnica: Esta versión corresponde a la fase preliminar para revisión de expertos. Su colaboración contribuye directamente a la validación de instrumentos psicométricos en ciencias de la salud.</em>
+                </p>
+              </div>
+
+              <div class="cuiag-nav-footer">
+                <div></div>
+                <button type="button" class="cuiag-btn cuiag-btn-gold" id="btnContinuarPaso0">
+                  Comenzar con el Consentimiento Informado ➡️
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- PIE DE PÁGINA INSTITUCIONAL -->
+  <footer class="cuiag-page-footer">
+    <div class="footer-inner">
+      <div>
+        <strong>FACSA - UJED</strong> • Instrumento Psicométrico CUIAG-CIS (v1.0-preliminar-expertos)
+      </div>
+      <div style="display: flex; align-items: center; gap: 16px;">
+        <span style="color: #fbbf24; font-weight: 700;">Participación Voluntaria y Anónima</span>
+        <a href="admin.html" style="color: var(--text-dim); text-decoration: none; font-size: 0.76rem;" title="Panel de Investigación (Coordinación / TI)">
+          🔒 Acceso Investigador
+        </a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- CONTENEDOR DE TOASTS -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- SCRIPTS DEL CUESTIONARIO -->
+  <script src="js/data.js?v=46"></script>
+  <script src="js/audio.js?v=46"></script>
+  <script src="js/cuiag.js?v=46"></script>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // 1. Cargar tema
+      const temaGuardado = localStorage.getItem('unicampus_theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', temaGuardado);
+      actualizarBotonTema(temaGuardado);
+
+      // 2. Renderizar el Cuestionario para Estudiantes de inmediato
+      if (typeof window.abrirCuestionarioEstudiantes === 'function') {
+        window.abrirCuestionarioEstudiantes();
+      }
+    });
+
+    // Alternar tema Claro / Oscuro
+    window.alternarTemaVisual = function() {
+      const actual = document.documentElement.getAttribute('data-theme') || 'dark';
+      const nuevo = actual === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', nuevo);
+      localStorage.setItem('unicampus_theme', nuevo);
+      actualizarBotonTema(nuevo);
+    };
+
+    function actualizarBotonTema(tema) {
+      const btn = document.getElementById('btnToggleTheme');
+      if (btn) btn.innerHTML = tema === 'dark' ? '☀️ Día' : '🌙 Noche';
+    }
+
+    // Notificaciones Toast
+    window.mostrarToast = function(mensaje, tipo = 'info') {
+      const cont = document.getElementById('toastContainer');
+      if (!cont) return;
+      const t = document.createElement('div');
+      t.className = 'toast-item';
+      if (tipo === 'success') t.style.borderColor = '#10b981';
+      if (tipo === 'error') t.style.borderColor = '#ef4444';
+      t.textContent = mensaje;
+      cont.appendChild(t);
+      setTimeout(() => {
+        t.style.opacity = '0';
+        t.style.transition = 'opacity 0.3s';
+        setTimeout(() => t.remove(), 300);
+      }, 3500);
+    };
+  </script>
+</body>
+</html>

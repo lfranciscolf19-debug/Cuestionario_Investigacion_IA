@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel de Investigación CUIAG-CIS | FACSA - UJED</title>
+  <meta name="description" content="Panel Administrativo de Investigación y Análisis Psicométrico CUIAG-CIS - FACSA UJED">
+  
+  <!-- Tipografía Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Estilos del Cuestionario e Identidad Institucional -->
+  <link rel="stylesheet" href="css/cuiag.css?v=2">
+  <style>
+    :root {
+      --bg-main: #0b0f19;
+      --card-bg: #1e293b;
+      --bg-secondary: #0f172a;
+      --border-color: rgba(255, 255, 255, 0.1);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --accent-gold: #c9a227;
+      --accent-crimson: #7f1d1d;
+      --med-color: #38bdf8;
+      --psi-color: #a855f7;
+      --nut-color: #4ade80;
+    }
+
+    [data-theme="light"] {
+      --bg-main: #f1f5f9;
+      --card-bg: #ffffff;
+      --bg-secondary: #f8fafc;
+      --border-color: rgba(0, 0, 0, 0.1);
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --text-dim: #94a3b8;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg-main);
+      color: var(--text-main);
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Cabecera del Panel */
+    .admin-app-header {
+      background: rgba(15, 23, 42, 0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 0.85rem 1.8rem;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .header-brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .header-brand img {
+      height: 44px;
+      width: auto;
+      object-fit: contain;
+    }
+
+    .header-brand-title {
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: #ffffff;
+      letter-spacing: -0.3px;
+    }
+
+    .header-brand-subtitle {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .header-tools {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .btn-portal-alumno {
+      background: rgba(201, 162, 39, 0.15);
+      border: 1px solid rgba(201, 162, 39, 0.45);
+      color: #fbbf24;
+      padding: 8px 16px;
+      border-radius: 10px;
+      font-size: 0.84rem;
+      font-weight: 700;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .btn-portal-alumno:hover {
+      background: rgba(201, 162, 39, 0.28);
+      border-color: #fbbf24;
+      transform: translateY(-1px);
+    }
+
+    /* Candado de Inicio de Sesión de Investigador */
+    .admin-auth-card {
+      max-width: 480px;
+      margin: 4rem auto;
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 2.5rem 2rem;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3);
+      text-align: center;
+    }
+
+    .admin-auth-icon {
+      font-size: 3.5rem;
+      margin-bottom: 0.8rem;
+    }
+
+    .custom-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      border-radius: 10px;
+      overflow: hidden;
+      margin-top: 10px;
+    }
+
+    .custom-table th {
+      background: var(--bg-secondary);
+      color: var(--text-muted);
+      padding: 10px 14px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .custom-table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border-color);
+      color: var(--text-main);
+      font-size: 0.86rem;
+    }
+
+    .custom-table tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+
+    .admin-viewport {
+      flex: 1;
+      width: 100%;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 2rem 1rem 4rem;
+    }
+
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .toast-item {
+      background: #1e293b;
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 12px 18px;
+      border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      font-size: 0.88rem;
+      font-weight: 600;
+      animation: cuiagFadeIn 0.25s ease-out;
+    }
+
+    .cuiag-page-footer {
+      margin-top: auto;
+      background: rgba(15, 23, 42, 0.75);
+      border-top: 1px solid var(--border-color);
+      padding: 1.2rem 1.8rem;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .footer-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- CABECERA INSTITUCIONAL EXCLUSIVA DEL PANEL -->
+  <header class="admin-app-header">
+    <div class="header-brand">
+      <img src="img/logo-facsa.png" alt="FACSA UJED">
+      <div>
+        <div class="header-brand-title">🔬 Panel de Investigación: CUIAG-CIS</div>
+        <div class="header-brand-subtitle">
+          <span>Comité de Investigación y Coordinación</span>
+          <span>•</span>
+          <span style="color: #fbbf24;">FACSA · UJED</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="header-tools">
+      <a href="index.html" class="btn-portal-alumno" title="Ver el cuestionario como lo ve el alumno">
+        📋 Vista de Alumnos
+      </a>
+      <button type="button" class="cuiag-btn cuiag-btn-secondary" id="btnToggleTheme" onclick="alternarTemaVisual()" style="padding: 6px 12px; font-size: 0.82rem;">
+        ☀️ Día
+      </button>
+      <button type="button" class="cuiag-btn cuiag-btn-secondary" id="btnCerrarSesionAdmin" onclick="cerrarSesionAdmin()" style="display: none; padding: 6px 12px; font-size: 0.82rem; color: #f87171; border-color: rgba(239,68,68,0.3);">
+        Salir
+      </button>
+    </div>
+  </header>
+
+  <!-- CONTENEDOR PRINCIPAL DEL PANEL -->
+  <main class="admin-viewport">
+
+    <!-- PUERTA DE AUTENTICACIÓN / CANDADO -->
+    <div id="adminAuthGate" class="admin-auth-card">
+      <div class="admin-auth-icon">🔐</div>
+      <h2 style="font-size: 1.5rem; font-weight: 800; color: var(--text-main); margin-bottom: 6px;">
+        Acceso de Investigador
+      </h2>
+      <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 1.8rem; line-height: 1.5;">
+        Para consultar las respuestas, métricas descriptivas y descargar el archivo Excel con gráficos, selecciona tu perfil institucional autorizado.
+      </p>
+
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <button type="button" class="cuiag-btn cuiag-btn-gold" onclick="desbloquearAcceso('superadmin')" style="width: 100%; justify-content: center; padding: 12px; font-size: 0.95rem;">
+          👑 Ingresar como Superadmin TI / Investigador Principal
+        </button>
+        <button type="button" class="cuiag-btn cuiag-btn-secondary" onclick="desbloquearAcceso('admin')" style="width: 100%; justify-content: center; padding: 12px; font-size: 0.95rem;">
+          👨‍💼 Ingresar como Coordinador Académico
+        </button>
+      </div>
+
+      <div style="margin-top: 1.8rem; padding-top: 1.2rem; border-top: 1px solid var(--border-color); font-size: 0.78rem; color: var(--text-muted);">
+        🔒 La información de este estudio se encuentra protegida bajo estricto anonimato y confidencialidad ética.
+      </div>
+    </div>
+
+    <!-- CONTENEDOR DINÁMICO DEL PANEL ADMINISTRATIVO -->
+    <div id="cuiagAdminPanelContent" style="display: none;"></div>
+
+  </main>
+
+  <!-- PIE DE PÁGINA -->
+  <footer class="cuiag-page-footer">
+    <div class="footer-inner">
+      <div>
+        <strong>FACSA - UJED</strong> • Módulo de Gestión de Investigación CUIAG-CIS (v1.0-preliminar-expertos)
+      </div>
+      <div>
+        <a href="index.html" style="color: var(--accent-gold, #c9a227); text-decoration: none; font-weight: 700;">
+          Ir al Cuestionario de Estudiantes ➡️
+        </a>
+      </div>
+    </div>
+  </footer>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- SCRIPTS -->
+  <script src="js/data.js?v=46"></script>
+  <script src="js/audio.js?v=46"></script>
+  <script src="js/cuiag.js?v=46"></script>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // 1. Cargar tema
+      const temaGuardado = localStorage.getItem('unicampus_theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', temaGuardado);
+      actualizarBotonTema(temaGuardado);
+
+      // 2. Comprobar si ya tiene sesión previa
+      window.rolActual = localStorage.getItem('fcs_rol') || null;
+      if (window.rolActual === 'superadmin' || window.rolActual === 'admin') {
+        mostrarPanel();
+      }
+    });
+
+    window.desbloquearAcceso = function(rol) {
+      window.rolActual = rol;
+      localStorage.setItem('fcs_rol', rol);
+      mostrarToast(`Sesión autorizada como ${rol === 'superadmin' ? 'Superadmin TI' : 'Coordinador Académico'}`, 'success');
+      mostrarPanel();
+    };
+
+    function mostrarPanel() {
+      const gate = document.getElementById('adminAuthGate');
+      const panel = document.getElementById('cuiagAdminPanelContent');
+      const btnSalir = document.getElementById('btnCerrarSesionAdmin');
+
+      if (gate) gate.style.display = 'none';
+      if (panel) {
+        panel.style.display = 'block';
+        if (typeof window.renderPanelAdminCUIAG === 'function') {
+          window.renderPanelAdminCUIAG();
+        }
+      }
+      if (btnSalir) btnSalir.style.display = 'inline-flex';
+    }
+
+    window.cerrarSesionAdmin = function() {
+      localStorage.removeItem('fcs_rol');
+      window.rolActual = null;
+      const gate = document.getElementById('adminAuthGate');
+      const panel = document.getElementById('cuiagAdminPanelContent');
+      const btnSalir = document.getElementById('btnCerrarSesionAdmin');
+
+      if (gate) gate.style.display = 'block';
+      if (panel) panel.style.display = 'none';
+      if (btnSalir) btnSalir.style.display = 'none';
+      mostrarToast('Sesión administrativa finalizada.', 'info');
+    };
+
+    window.alternarTemaVisual = function() {
+      const actual = document.documentElement.getAttribute('data-theme') || 'dark';
+      const nuevo = actual === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', nuevo);
+      localStorage.setItem('unicampus_theme', nuevo);
+      actualizarBotonTema(nuevo);
+    };
+
+    function actualizarBotonTema(tema) {
+      const btn = document.getElementById('btnToggleTheme');
+      if (btn) btn.innerHTML = tema === 'dark' ? '☀️ Día' : '🌙 Noche';
+    }
+
+    window.mostrarToast = function(mensaje, tipo = 'info') {
+      const cont = document.getElementById('toastContainer');
+      if (!cont) return;
+      const t = document.createElement('div');
+      t.className = 'toast-item';
+      if (tipo === 'success') t.style.borderColor = '#10b981';
+      if (tipo === 'error') t.style.borderColor = '#ef4444';
+      t.textContent = mensaje;
+      cont.appendChild(t);
+      setTimeout(() => {
+        t.style.opacity = '0';
+        t.style.transition = 'opacity 0.3s';
+        setTimeout(() => t.remove(), 300);
+      }, 3500);
+    };
+  </script>
+</body>
+</html>

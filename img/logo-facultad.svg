@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="100%" height="100%">
+  <defs>
+    <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e3a8a"/>
+      <stop offset="50%" stop-color="#2563eb"/>
+      <stop offset="100%" stop-color="#0284c7"/>
+    </linearGradient>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b"/>
+      <stop offset="50%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- Escudo Central -->
+  <g filter="url(#shadow)">
+    <!-- Borde exterior dorado -->
+    <path d="M 250 30 C 370 30 430 70 430 200 C 430 330 330 420 250 470 C 170 420 70 330 70 200 C 70 70 130 30 250 30 Z" 
+          fill="url(#goldGrad)" stroke="#b45309" stroke-width="4"/>
+    
+    <!-- Fondo azul del escudo -->
+    <path d="M 250 45 C 355 45 410 82 410 200 C 410 318 318 402 250 450 C 182 402 90 318 90 200 C 90 82 145 45 250 45 Z" 
+          fill="url(#shieldGrad)"/>
+  </g>
+
+  <!-- Laurel perimetral sutil -->
+  <circle cx="250" cy="235" r="130" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="3" stroke-dasharray="10 8"/>
+
+  <!-- Símbolo Médico / Vara de Esculapio -->
+  <!-- Vara central dorada -->
+  <rect x="244" y="110" width="12" height="230" rx="6" fill="url(#goldGrad)" stroke="#78350f" stroke-width="1.5"/>
+  <circle cx="250" cy="105" r="14" fill="url(#goldGrad)"/>
+
+  <!-- Serpiente de Esculapio en relieve blanco / cian -->
+  <path d="M 250 130 Q 285 155 250 185 Q 215 215 250 245 Q 285 275 250 305 Q 230 325 250 340" 
+        fill="none" stroke="#ffffff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <!-- Cabeza de la serpiente -->
+  <ellipse cx="264" cy="138" rx="8" ry="5" transform="rotate(-30 264 138)" fill="#ffffff"/>
+  <circle cx="266" cy="136" r="1.5" fill="#1e3a8a"/>
+
+  <!-- Símbolos de Psicología y Nutrición en los flancos -->
+  <!-- Flanco Izquierdo: Letra Psi (Ψ) para Psicología -->
+  <g transform="translate(145, 230) scale(0.65)" stroke="#ffffff" fill="none" stroke-width="7" stroke-linecap="round">
+    <path d="M 10 0 L 10 40 C 10 70 70 70 70 40 L 70 0"/>
+    <line x1="40" y1="0" x2="40" y2="85"/>
+    <line x1="20" y1="85" x2="60" y2="85"/>
+  </g>
+
+  <!-- Flanco Derecho: Hoja / Manzana estilizada para Nutrición -->
+  <g transform="translate(305, 225) scale(0.65)" fill="none" stroke="#34d399" stroke-width="6" stroke-linecap="round">
+    <path d="M 40 10 Q 75 10 75 50 Q 75 80 40 85 Q 5 80 5 50 Q 5 10 40 10 Z" fill="rgba(52, 211, 153, 0.25)"/>
+    <path d="M 40 20 Q 40 50 40 75"/>
+    <path d="M 40 35 Q 25 25 15 35"/>
+    <path d="M 40 50 Q 55 40 65 50"/>
+  </g>
+
+  <!-- Lema / Texto de Arco -->
+  <path id="curveTop" d="M 100 130 Q 250 40 400 130" fill="none"/>
+  <text font-family="'Plus Jakarta Sans', sans-serif" font-size="19" font-weight="800" fill="#f8fafc" letter-spacing="2">
+    <textPath href="#curveTop" startOffset="50%" text-anchor="middle">
+      CIENCIAS DE LA SALUD
+    </textPath>
+  </text>
+
+  <!-- Cinta inferior -->
+  <path d="M 110 395 Q 250 435 390 395 L 375 425 Q 250 465 125 425 Z" fill="#111827" stroke="url(#goldGrad)" stroke-width="2"/>
+  <text x="250" y="418" font-family="'Plus Jakarta Sans', sans-serif" font-size="14" font-weight="700" fill="#fbbf24" text-anchor="middle" letter-spacing="3">
+    MEDICINA • PSICOLOGÍA • NUTRICIÓN
+  </text>
+</svg>
