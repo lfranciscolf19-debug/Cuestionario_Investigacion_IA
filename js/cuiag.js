@@ -1025,9 +1025,11 @@
     `;
 
     try {
+      const adminKey = window.adminKey || sessionStorage.getItem('fcs_admin_key') || '';
       const res = await fetch('/api/cuiag/admin/metricas', {
         headers: {
-          'X-FACSA-Role': window.rolActual || 'consulta'
+          'X-FACSA-Role': window.rolActual || 'superadmin',
+          'X-FACSA-Key': adminKey
         }
       });
 
@@ -1262,9 +1264,13 @@
       defaultFilename = 'cuiag_cis_analisis_graficos.xlsx';
     }
     
-    // Realizar fetch con cabecera de rol y disparar descarga de archivo
+    // Realizar fetch con cabeceras de rol y clave de investigador
+    const adminKey = window.adminKey || sessionStorage.getItem('fcs_admin_key') || '';
     fetch(endpoint, {
-      headers: { 'X-FACSA-Role': rol }
+      headers: { 
+        'X-FACSA-Role': rol,
+        'X-FACSA-Key': adminKey
+      }
     })
     .then(response => {
       if (!response.ok) throw new Error('Error al descargar');
@@ -1292,6 +1298,7 @@
 
   window.toggleEstadoRecepcionCUIAG = async function(nuevoEstado) {
     const rol = window.rolActual || 'consulta';
+    const adminKey = window.adminKey || sessionStorage.getItem('fcs_admin_key') || '';
     if (rol !== 'superadmin' && rol !== 'admin') return;
 
     try {
@@ -1299,7 +1306,8 @@
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-FACSA-Role': rol
+          'X-FACSA-Role': rol,
+          'X-FACSA-Key': adminKey
         },
         body: JSON.stringify({ recepcion_activa: nuevoEstado })
       });

@@ -258,24 +258,38 @@
   <!-- CONTENEDOR PRINCIPAL DEL PANEL -->
   <main class="admin-viewport">
 
-    <!-- PUERTA DE AUTENTICACIÓN / CANDADO -->
+    <!-- PUERTA DE AUTENTICACIÓN CON CONTRASEÑA -->
     <div id="adminAuthGate" class="admin-auth-card">
       <div class="admin-auth-icon">🔐</div>
       <h2 style="font-size: 1.5rem; font-weight: 800; color: var(--text-main); margin-bottom: 6px;">
-        Acceso de Investigador
+        Acceso Restringido
       </h2>
-      <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 1.8rem; line-height: 1.5;">
-        Para consultar las respuestas, métricas descriptivas y descargar el archivo Excel con gráficos, selecciona tu perfil institucional autorizado.
+      <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 1.6rem; line-height: 1.5;">
+        Este módulo es exclusivo para el comité de investigación de FACSA · UJED. Ingrese la contraseña de autorización.
       </p>
 
-      <div style="display: flex; flex-direction: column; gap: 12px;">
-        <button type="button" class="cuiag-btn cuiag-btn-gold" onclick="desbloquearAcceso('superadmin')" style="width: 100%; justify-content: center; padding: 12px; font-size: 0.95rem;">
-          👑 Ingresar como Superadmin TI / Investigador Principal
+      <form onsubmit="validarClaveAdmin(event)" style="display: flex; flex-direction: column; gap: 14px;">
+        <div style="text-align: left;">
+          <label for="inputClaveAdmin" style="display: block; font-size: 0.82rem; font-weight: 700; color: var(--text-muted); margin-bottom: 6px;">
+            Contraseña de Investigador:
+          </label>
+          <input 
+            type="password" 
+            id="inputClaveAdmin" 
+            placeholder="••••••••••••" 
+            required 
+            autocomplete="current-password"
+            style="width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-main); font-size: 1rem; outline: none; transition: border-color 0.2s;"
+          >
+        </div>
+
+        <div id="errorClaveAdmin" style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid #ef4444; border-radius: 8px; padding: 10px; color: #f87171; font-size: 0.85rem; font-weight: 600; text-align: center;">
+        </div>
+
+        <button type="submit" id="btnIngresarAdmin" class="cuiag-btn cuiag-btn-gold" style="width: 100%; justify-content: center; padding: 12px; font-size: 0.95rem; font-weight: 700;">
+          🔓 Ingresar al Panel de Investigación
         </button>
-        <button type="button" class="cuiag-btn cuiag-btn-secondary" onclick="desbloquearAcceso('admin')" style="width: 100%; justify-content: center; padding: 12px; font-size: 0.95rem;">
-          👨‍💼 Ingresar como Coordinador Académico
-        </button>
-      </div>
+      </form>
 
       <div style="margin-top: 1.8rem; padding-top: 1.2rem; border-top: 1px solid var(--border-color); font-size: 0.78rem; color: var(--text-muted);">
         🔒 La información de este estudio se encuentra protegida bajo estricto anonimato y confidencialidad ética.
@@ -291,7 +305,7 @@
   <footer class="cuiag-page-footer">
     <div class="footer-inner">
       <div>
-        <strong>FACSA - UJED</strong> • Módulo de Gestión de Investigación CUIAG-CIS (v1.0-preliminar-expertos)
+        <strong>FACSA - UJED</strong> • Comité de Investigación CUIAG-CIS
       </div>
       <div>
         <a href="index.html" style="color: var(--accent-gold, #c9a227); text-decoration: none; font-weight: 700;">
@@ -315,19 +329,58 @@
       document.documentElement.setAttribute('data-theme', temaGuardado);
       actualizarBotonTema(temaGuardado);
 
-      // 2. Comprobar si ya tiene sesión previa
-      window.rolActual = localStorage.getItem('fcs_rol') || null;
-      if (window.rolActual === 'superadmin' || window.rolActual === 'admin') {
+      // 2. Comprobar si ya tiene clave en sesión
+      window.adminKey = sessionStorage.getItem('fcs_admin_key') || null;
+      window.rolActual = sessionStorage.getItem('fcs_rol') || null;
+      if (window.adminKey) {
         mostrarPanel();
       }
     });
 
-    window.desbloquearAcceso = function(rol) {
-      window.rolActual = rol;
-      localStorage.setItem('fcs_rol', rol);
-      mostrarToast(`Sesión autorizada como ${rol === 'superadmin' ? 'Superadmin TI' : 'Coordinador Académico'}`, 'success');
-      mostrarPanel();
-    };
+    async function validarClaveAdmin(e) {
+      e.preventDefault();
+      const input = document.getElementById('inputClaveAdmin');
+      const errBox = document.getElementById('errorClaveAdmin');
+      const btn = document.getElementById('btnIngresarAdmin');
+      const clave = input ? input.value.trim() : '';
+
+      if (!clave) return;
+
+      btn.disabled = true;
+      btn.textContent = '⏳ Verificando...';
+      if (errBox) errBox.style.display = 'none';
+
+      try {
+        const res = await fetch('/api/cuiag/admin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ clave: clave })
+        });
+
+        const data = await res.json();
+        if (res.ok && data.ok) {
+          window.adminKey = data.key || clave;
+          window.rolActual = data.rol || 'superadmin';
+          sessionStorage.setItem('fcs_admin_key', window.adminKey);
+          sessionStorage.setItem('fcs_rol', window.rolActual);
+          mostrarToast('Acceso autorizado como Investigador.', 'success');
+          mostrarPanel();
+        } else {
+          throw new Error(data.error || 'Contraseña incorrecta.');
+        }
+      } catch (err) {
+        if (errBox) {
+          errBox.textContent = `❌ ${err.message}`;
+          errBox.style.display = 'block';
+        }
+        btn.disabled = false;
+        btn.textContent = '🔓 Ingresar al Panel de Investigación';
+        if (input) {
+          input.value = '';
+          input.focus();
+        }
+      }
+    }
 
     function mostrarPanel() {
       const gate = document.getElementById('adminAuthGate');
@@ -345,7 +398,10 @@
     }
 
     window.cerrarSesionAdmin = function() {
+      sessionStorage.removeItem('fcs_admin_key');
+      sessionStorage.removeItem('fcs_rol');
       localStorage.removeItem('fcs_rol');
+      window.adminKey = null;
       window.rolActual = null;
       const gate = document.getElementById('adminAuthGate');
       const panel = document.getElementById('cuiagAdminPanelContent');
@@ -354,6 +410,8 @@
       if (gate) gate.style.display = 'block';
       if (panel) panel.style.display = 'none';
       if (btnSalir) btnSalir.style.display = 'none';
+      const input = document.getElementById('inputClaveAdmin');
+      if (input) input.value = '';
       mostrarToast('Sesión administrativa finalizada.', 'info');
     };
 

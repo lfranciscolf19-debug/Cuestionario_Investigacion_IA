@@ -31,6 +31,7 @@ os.makedirs(DATA_DIR, exist_ok=True)
 DB_PATH = os.path.join(DATA_DIR, 'cuiag_investigacion.db')
 
 VERSION_INSTRUMENTO = "1.0-preliminar-expertos"
+ADMIN_PASSWORD = os.environ.get('CUIAG_ADMIN_PASSWORD', 'facsa2026')
 ITEMS_INVERSOS = {16, 23, 29, 36}
 
 DIMENSIONES_METADATA = [
@@ -165,20 +166,26 @@ class FACSAHTTPHandler(SimpleHTTPRequestHandler):
         self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate')
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type, X-FACSA-Role')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type, X-FACSA-Role, X-FACSA-Key')
         self.end_headers()
         self.wfile.write(json.dumps(datos, ensure_ascii=False).encode('utf-8'))
 
     def _es_autorizado_admin(self):
-        """Verifica que la petición provenga de un usuario administrativo autorizado."""
+        """Verifica que la petición provenga de un usuario administrativo con clave válida."""
+        clave = self.headers.get('X-FACSA-Key', '').strip()
+        if clave == ADMIN_PASSWORD:
+            return True
         rol = self.headers.get('X-FACSA-Role', '').strip().lower()
-        return rol in ['superadmin', 'admin']
+        client_ip = self.client_address[0] if hasattr(self, 'client_address') else ''
+        if client_ip in ('127.0.0.1', 'localhost', '::1') and rol in ['superadmin', 'admin']:
+            return True
+        return False
 
     def do_OPTIONS(self):
         self.send_response(204)
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type, X-FACSA-Role')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type, X-FACSA-Role, X-FACSA-Key')
         self.end_headers()
 
     def do_GET(self):
@@ -229,11 +236,37 @@ class FACSAHTTPHandler(SimpleHTTPRequestHandler):
             self.manejar_post_respuestas()
             return
 
+        if path == '/api/cuiag/admin/login':
+            self.manejar_post_login_admin()
+            return
+
         if path == '/api/cuiag/admin/config':
             self.manejar_post_config()
             return
 
         self._responder_json(404, {"error": "Ruta de API no encontrada"})
+
+    def manejar_post_login_admin(self):
+        """Valida la contraseña de acceso al panel de investigación."""
+        try:
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8')
+            datos = json.loads(body) if body else {}
+            clave = str(datos.get('clave', '')).strip()
+
+            if clave == ADMIN_PASSWORD:
+                rol_asignado = 'superadmin'
+                registrar_auditoria_admin(rol_asignado, 'Inicio de Sesión', 'Acceso autorizado al panel de investigación con clave')
+                self._responder_json(200, {
+                    "ok": True,
+                    "mensaje": "Acceso de investigación autorizado.",
+                    "rol": rol_asignado,
+                    "key": ADMIN_PASSWORD
+                })
+            else:
+                self._responder_json(401, {"error": "Contraseña de acceso incorrecta. Intente de nuevo."})
+        except Exception as e:
+            self._responder_json(400, {"error": f"Petición inválida: {str(e)}"})
 
     # -----------------------------------------------------------------
     # CONTROLADORES DE ENDPOINTS
