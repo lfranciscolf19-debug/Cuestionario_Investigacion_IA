@@ -181,7 +181,7 @@
             Uso de inteligencia artificial generativa y competencias investigativas en estudiantes del área de la salud.
           </p>
           <div class="cuiag-privacy-notice-badge">
-            🔒 Participación 100% Voluntaria y Anónima (Sin matrícula ni datos personales)
+            🔒 Participación Anónima (Sin matrícula ni datos personales)
           </div>
         </div>
 
@@ -1063,6 +1063,8 @@
     const cfg = data.config || {};
     const items = data.items || {};
 
+    const urlAlumnos = data.url_alumnos || `${window.location.protocol}//${window.location.hostname}:8080/`;
+
     let html = `
       <div class="cuiag-admin-container">
         <!-- CABECERA DEL PANEL -->
@@ -1092,6 +1094,32 @@
             </button>
             <button type="button" class="cuiag-btn cuiag-btn-secondary" onclick="window.renderPanelAdminCUIAG()" style="padding: 8px 12px; font-size: 0.85rem;" title="Recargar métricas">
               🔄
+            </button>
+          </div>
+        </div>
+
+        <!-- TARJETA DESTACADA: ENLACE Y PROYECCIÓN PARA ALUMNOS -->
+        <div style="background: linear-gradient(135deg, rgba(201, 162, 39, 0.14) 0%, rgba(15, 23, 42, 0.95) 100%); border: 1px solid rgba(201, 162, 39, 0.45); border-radius: 14px; padding: 1.3rem 1.5rem; margin-bottom: 1.8rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; box-shadow: 0 6px 20px rgba(0,0,0,0.25);">
+          <div style="flex: 1; min-width: 280px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 0.78rem; font-weight: 800; text-transform: uppercase; color: #fbbf24; letter-spacing: 0.5px;">
+                📲 ENLACE PARA COMPARTIR CON TUS ALUMNOS
+              </span>
+              <span style="background: #10b981; color: #ffffff; font-size: 0.68rem; font-weight: 800; padding: 2px 7px; border-radius: 4px;">LISTO PARA RESPONDER</span>
+            </div>
+            <div style="font-size: 1.18rem; font-weight: 800; color: #ffffff; margin: 6px 0 4px; font-family: 'JetBrains Mono', monospace; word-break: break-all;">
+              ${urlAlumnos}
+            </div>
+            <div style="font-size: 0.82rem; color: var(--text-muted);">
+              📌 Comparte este enlace en clase o proyecta el código QR para que los alumnos lo abran en sus celulares (Misma red Wi-Fi).
+            </div>
+          </div>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+            <button type="button" class="cuiag-btn cuiag-btn-gold" onclick="window.copiarEnlaceAlumnos('${urlAlumnos}')" style="padding: 10px 18px; font-size: 0.88rem; font-weight: 800;">
+              📋 Copiar Enlace
+            </button>
+            <button type="button" class="cuiag-btn" onclick="window.mostrarModalQRAlumnos('${urlAlumnos}')" style="padding: 10px 18px; font-size: 0.88rem; font-weight: 800; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: #ffffff; box-shadow: 0 4px 14px rgba(59, 130, 246, 0.4);">
+              📷 Proyectar Código QR
             </button>
           </div>
         </div>
@@ -1320,6 +1348,54 @@
     } catch (e) {
       alert('Error al actualizar configuración: ' + e.message);
     }
+  };
+
+  // Copiar enlace para compartir con alumnos
+  window.copiarEnlaceAlumnos = function(url) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(() => {
+        if (typeof mostrarToast === 'function') {
+          mostrarToast('¡Enlace copiado al portapapeles! Listo para enviar a tus alumnos.', 'success');
+        } else {
+          alert('¡Enlace copiado al portapapeles!\n\n' + url);
+        }
+      }).catch(() => {
+        prompt('Copia este enlace para tus alumnos:', url);
+      });
+    } else {
+      prompt('Copia este enlace para tus alumnos:', url);
+    }
+  };
+
+  // Proyectar modal con código QR grande
+  window.mostrarModalQRAlumnos = function(url) {
+    let modal = document.getElementById('modalQRAlumnos');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'modalQRAlumnos';
+      modal.style.cssText = 'position:fixed;inset:0;background:rgba(11,15,25,0.88);z-index:99999;display:flex;align-items:center;justify-content:center;padding:1.5rem;backdrop-filter:blur(8px);animation:cuiagFadeIn 0.25s ease-out;';
+      document.body.appendChild(modal);
+    }
+    const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=' + encodeURIComponent(url);
+    modal.innerHTML = `
+      <div style="background:#1e293b;border:1px solid rgba(201,162,39,0.4);border-radius:22px;max-width:480px;width:100%;padding:2.2rem 2rem;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,0.6);position:relative;">
+        <button onclick="document.getElementById('modalQRAlumnos').style.display='none'" style="position:absolute;top:16px;right:18px;background:rgba(255,255,255,0.08);border:none;color:#94a3b8;font-size:1.2rem;width:34px;height:34px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.2s;" title="Cerrar modal">✕</button>
+        <div style="font-size:0.75rem;text-transform:uppercase;color:#fbbf24;font-weight:800;letter-spacing:0.5px;margin-bottom:6px;">FACSA · UJED • PROTOCOLO CUIAG-CIS</div>
+        <h3 style="color:#ffffff;font-size:1.4rem;font-weight:800;margin-bottom:6px;">Escanear para Responder</h3>
+        <p style="color:#94a3b8;font-size:0.86rem;margin-bottom:1.4rem;line-height:1.4;">
+          Apunta la cámara de tu celular a este código para acceder directamente al cuestionario.
+        </p>
+        <div style="background:#ffffff;padding:16px;border-radius:16px;display:inline-block;box-shadow:0 10px 30px rgba(0,0,0,0.3);">
+          <img src="${qrUrl}" alt="Código QR Cuestionario CUIAG-CIS" style="width:260px;height:260px;display:block;">
+        </div>
+        <div style="background:rgba(15,23,42,0.7);padding:10px 14px;border-radius:10px;margin-top:1.4rem;border:1px solid rgba(255,255,255,0.1);">
+          <div style="font-size:0.72rem;color:#94a3b8;text-transform:uppercase;font-weight:700;margin-bottom:2px;">Enlace Directo:</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:0.95rem;color:#38bdf8;font-weight:700;word-break:break-all;">${url}</div>
+        </div>
+        <p style="font-size:0.78rem;color:#64748b;margin-top:12px;">🔒 Participación Anónima (Sin matrícula ni datos personales)</p>
+      </div>
+    `;
+    modal.style.display = 'flex';
   };
 
 })();

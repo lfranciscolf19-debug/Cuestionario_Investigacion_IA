@@ -6,7 +6,7 @@ echo   Cuestionario CUIAG-CIS - Investigacion e IA en Salud
 echo   Medicina | Psicologia | Nutricion
 echo ========================================================
 echo.
-echo Iniciando servidor local en http://localhost:8080/ ...
+echo Iniciando servidor del cuestionario...
 start http://localhost:8080/
 if exist "server.py" (
     python server.py 8080

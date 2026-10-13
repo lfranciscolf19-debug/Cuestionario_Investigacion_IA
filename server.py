@@ -13,10 +13,25 @@ import sqlite3
 import uuid
 import csv
 import io
+import socket
 from datetime import datetime
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 import urllib.parse
 from excel_report import generar_excel_cuiag
+
+def obtener_ip_red():
+    """Detecta la IP local de la computadora en la red Wi-Fi o Ethernet."""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(('8.8.8.8', 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        try:
+            return socket.gethostbyname(socket.gethostname())
+        except Exception:
+            return '127.0.0.1'
 
 PORT = int(os.environ.get('PORT', 8080))
 if len(sys.argv) > 1:
@@ -428,7 +443,7 @@ class FACSAHTTPHandler(SimpleHTTPRequestHandler):
 
             self._responder_json(201, {
                 "ok": True,
-                "mensaje": "Sus respuestas han sido registradas exitosamente de manera voluntaria y anónima. ¡Muchas gracias por su participación en la investigación!",
+                "mensaje": "Sus respuestas han sido registradas exitosamente de manera anónima. ¡Muchas gracias por su participación en la investigación!",
                 "id_confirmacion": id_tecnico
             })
         except sqlite3.IntegrityError:
@@ -521,6 +536,8 @@ class FACSAHTTPHandler(SimpleHTTPRequestHandler):
                 },
                 "items": frecuencias_items,
                 "dimensiones": DIMENSIONES_METADATA,
+                "ip_local": obtener_ip_red(),
+                "url_alumnos": f"http://{obtener_ip_red()}:{PORT}/",
                 "config": {
                     "recepcion_activa": config.get("recepcion_activa", "1") == "1",
                     "aprobacion_institucional": config.get("confirmacion_aprobacion_institucional", "1") == "1",
@@ -766,11 +783,19 @@ def iniciar_servidor():
     inicializar_bd()
     server_address = ('', PORT)
     httpd = HTTPServer(server_address, FACSAHTTPHandler)
-    print("=" * 64)
-    print(f"  [FACSA-UJED] Sistema UniCampus + Modulo CUIAG-CIS")
-    print(f"  Servidor HTTP y API REST en ejecucion en http://localhost:{PORT}/")
-    print(f"  Base de datos SQLite: {DB_PATH}")
-    print("=" * 64)
+    ip_actual = obtener_ip_red()
+    print("=" * 68)
+    print("  🏛️  FACULTAD DE CIENCIAS DE LA SALUD (FACSA - UJED)")
+    print("  🔬  Cuestionario CUIAG-CIS • Servidor Activo")
+    print("=" * 68)
+    print("  📲  ENLACE PARA TUS ALUMNOS (Misma red Wi-Fi / Aula):")
+    print(f"      👉 http://{ip_actual}:{PORT}/")
+    print("      (Copia y comparte este enlace con tus estudiantes)")
+    print("  --------------------------------------------------------------")
+    print(f"  💻  Tu acceso local en esta PC:  http://localhost:{PORT}/")
+    print(f"  🔐  Panel de Investigador (Admin): http://localhost:{PORT}/admin")
+    print(f"  📂  Base de datos SQLite:         {DB_PATH}")
+    print("=" * 68)
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
