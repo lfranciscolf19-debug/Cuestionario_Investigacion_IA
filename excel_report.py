@@ -70,14 +70,20 @@ ENUNCIADOS_ITEMS = {
     40: "Puedo comunicar resultados y conclusiones de investigación de forma clara y fundamentada."
 }
 
-def generar_excel_cuiag(db_path):
+def generar_excel_cuiag(db_path=None):
     """Genera un archivo Excel (.xlsx) estructurado con tres hojas, formato institucional y gráficos integrados."""
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM cuiag_respuestas ORDER BY timestamp DESC")
-    filas = cursor.fetchall()
-    conn.close()
+    filas = []
+    try:
+        import db_adapter
+        filas = db_adapter.obtener_todas_las_respuestas()
+    except Exception as e:
+        if db_path and os.path.exists(db_path):
+            conn = sqlite3.connect(db_path)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM cuiag_respuestas ORDER BY timestamp DESC")
+            filas = cursor.fetchall()
+            conn.close()
 
     wb = openpyxl.Workbook()
 

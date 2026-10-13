@@ -18,6 +18,7 @@ from datetime import datetime
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 import urllib.parse
 from excel_report import generar_excel_cuiag
+import db_adapter
 
 def obtener_ip_red():
     """Detecta la IP local de la computadora en la red Wi-Fi o Ethernet."""
@@ -102,83 +103,19 @@ ENUNCIADOS_ITEMS = {
 }
 
 def inicializar_bd():
-    """Inicializa la base de datos SQLite con tablas normalizadas y consultas parametrizadas."""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-
-    # Tabla de respuestas CUIAG-CIS (anónima, sin datos personales)
-    columnas_items = ", ".join([f"item_{i} INTEGER NOT NULL" for i in range(1, 41)])
-    cursor.execute(f"""
-    CREATE TABLE IF NOT EXISTS cuiag_respuestas (
-        id TEXT PRIMARY KEY,
-        timestamp TEXT NOT NULL,
-        carrera TEXT NOT NULL,
-        edad INTEGER NOT NULL,
-        uso_ia_academico TEXT NOT NULL,
-        herramientas_ia TEXT NOT NULL,
-        frecuencia_uso TEXT NOT NULL,
-        tipo_version_ia TEXT DEFAULT '',
-        paga_suscripcion_ia TEXT DEFAULT '',
-        versiones_pago_ia TEXT DEFAULT '[]',
-        tiempo_uso_ia TEXT DEFAULT '',
-        {columnas_items},
-        version_instrumento TEXT NOT NULL,
-        estado TEXT NOT NULL DEFAULT 'completado',
-        token_envio TEXT UNIQUE NOT NULL
-    )
-    """)
-
-    # Migración de columnas de preguntas complementarias para bases de datos ya existentes
-    cursor.execute("PRAGMA table_info(cuiag_respuestas)")
-    columnas_existentes = {row[1] for row in cursor.fetchall()}
-    cols_complementarias = [
-        ("tipo_version_ia", "TEXT DEFAULT ''"),
-        ("paga_suscripcion_ia", "TEXT DEFAULT ''"),
-        ("versiones_pago_ia", "TEXT DEFAULT '[]'"),
-        ("tiempo_uso_ia", "TEXT DEFAULT ''")
-    ]
-    for col_nom, col_def in cols_complementarias:
-        if col_nom not in columnas_existentes:
-            cursor.execute(f"ALTER TABLE cuiag_respuestas ADD COLUMN {col_nom} {col_def}")
-
-    # Tabla de configuración administrativa
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS cuiag_config (
-        clave TEXT PRIMARY KEY,
-        valor TEXT NOT NULL
-    )
-    """)
-
-    # Valores por defecto de configuración
-    config_defaults = {
-        "recepcion_activa": "1",
-        "confirmacion_aprobacion_institucional": "1",
-        "mensaje_inactivo": "La recepción de respuestas se encuentra actualmente pausada por el comité de investigación."
-    }
-    for k, v in config_defaults.items():
-        cursor.execute("INSERT OR IGNORE INTO cuiag_config (clave, valor) VALUES (?, ?)", (k, v))
-
-    # Tabla de auditoría administrativa (solo acciones administrativas, sin respuestas ni identificadores personales)
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS cuiag_auditoria_admin (
-        id TEXT PRIMARY KEY,
-        timestamp TEXT NOT NULL,
-        usuario_rol TEXT NOT NULL,
-        accion TEXT NOT NULL,
-        detalle TEXT NOT NULL
-    )
-    """)
-
-    conn.commit()
-    conn.close()
+    """Inicializa la base de datos (PostgreSQL en la nube o SQLite local)."""
+    db_adapter.inicializar_bd()
 
 def registrar_auditoria_admin(usuario_rol, accion, detalle):
     """Registra una acción administrativa en la base de datos de auditoría."""
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = db_adapter.obtener_conexion()
         cursor = conn.cursor()
+        sql = db_adapter.adaptar_sql(
+            "INSERT INTO cuiag_auditoria_admin (id, timestamp, usuario_rol, accion, detalle) VALUES (?, ?, ?, ?, ?)"
+        )
         cursor.execute(
-            "INSERT INTO cuiag_auditoria_admin (id, timestamp, usuario_rol, accion, detalle) VALUES (?, ?, ?, ?, ?)",
+            sql,
             (f"AUD-CUIAG-{uuid.uuid4().hex[:8]}", datetime.now().isoformat(), usuario_rol, accion, detalle)
         )
         conn.commit()
@@ -313,9 +250,9 @@ class FACSAHTTPHandler(SimpleHTTPRequestHandler):
     def manejar_get_estado(self):
         """Devuelve el estado público de recepción del cuestionario."""
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = db_adapter.obtener_conexion()
             cursor = conn.cursor()
-            cursor.execute("SELECT clave, valor FROM cuiag_config")
+            cursor.execute(db_adapter.adaptar_sql("SELECT clave, valor FROM cuiag_config"))
             config = dict(cursor.fetchall())
             conn.close()
 
@@ -338,9 +275,9 @@ class FACSAHTTPHandler(SimpleHTTPRequestHandler):
         """Recibe, valida exhaustivamente en el backend y almacena respuestas anónimas."""
         # 1. Verificar estado de recepción
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = db_adapter.obtener_conexion()
             cursor = conn.cursor()
-            cursor.execute("SELECT clave, valor FROM cuiag_config")
+            cursor.execute(db_adapter.adaptar_sql("SELECT clave, valor FROM cuiag_config"))
             config = dict(cursor.fetchall())
             if config.get("recepcion_activa", "1") != "1" or config.get("confirmacion_aprobacion_institucional", "1") != "1":
                 conn.close()
@@ -372,7 +309,7 @@ class FACSAHTTPHandler(SimpleHTTPRequestHandler):
 
         # Verificar si el token ya fue registrado previamente
         try:
-            cursor.execute("SELECT id FROM cuiag_respuestas WHERE token_envio = ?", (token_envio,))
+            cursor.execute(db_adapter.adaptar_sql("SELECT id FROM cuiag_respuestas WHERE token_envio = ?"), (token_envio,))
             existente = cursor.fetchone()
             if existente:
                 conn.close()
@@ -477,7 +414,7 @@ class FACSAHTTPHandler(SimpleHTTPRequestHandler):
 
         try:
             sql = f"INSERT INTO cuiag_respuestas ({', '.join(columnas)}) VALUES ({placeholders})"
-            cursor.execute(sql, valores)
+            cursor.execute(db_adapter.adaptar_sql(sql), valores)
             conn.commit()
             conn.close()
 
@@ -486,12 +423,14 @@ class FACSAHTTPHandler(SimpleHTTPRequestHandler):
                 "mensaje": "Sus respuestas han sido registradas exitosamente de manera anónima. ¡Muchas gracias por su participación en la investigación!",
                 "id_confirmacion": id_tecnico
             })
-        except sqlite3.IntegrityError:
-            conn.close()
-            self._responder_json(409, {"error": "Envío duplicado detectado. Sus respuestas ya habían sido guardadas."})
         except Exception as e:
             conn.close()
-            self._responder_json(500, {"error": "Error interno al guardar respuestas."})
+            err_str = str(e).lower()
+            if 'unique' in err_str or 'duplicate' in err_str or 'integrity' in err_str:
+                self._responder_json(409, {"error": "Envío duplicado detectado. Sus respuestas ya habían sido guardadas."})
+            else:
+                print(f"[Error Guardar Respuestas] {e}", file=sys.stderr)
+                self._responder_json(500, {"error": "Error interno al guardar respuestas."})
 
     def manejar_get_metricas(self):
         """Devuelve estadísticas descriptivas agregadas para el panel de investigación (protegido por rol)."""
@@ -500,28 +439,27 @@ class FACSAHTTPHandler(SimpleHTTPRequestHandler):
             return
 
         try:
-            conn = sqlite3.connect(DB_PATH)
-            conn.row_factory = sqlite3.Row
+            conn = db_adapter.obtener_conexion()
             cursor = conn.cursor()
 
             # Total completados
-            cursor.execute("SELECT COUNT(*) FROM cuiag_respuestas WHERE estado = 'completado'")
+            cursor.execute(db_adapter.adaptar_sql("SELECT COUNT(*) FROM cuiag_respuestas WHERE estado = 'completado'"))
             total = cursor.fetchone()[0]
 
             # Distribución por carrera
-            cursor.execute("SELECT carrera, COUNT(*) as cantidad FROM cuiag_respuestas GROUP BY carrera")
+            cursor.execute(db_adapter.adaptar_sql("SELECT carrera, COUNT(*) as cantidad FROM cuiag_respuestas GROUP BY carrera"))
             por_carrera = {row['carrera']: row['cantidad'] for row in cursor.fetchall()}
 
             # Distribución por uso previo de IA
-            cursor.execute("SELECT uso_ia_academico, COUNT(*) as cantidad FROM cuiag_respuestas GROUP BY uso_ia_academico")
+            cursor.execute(db_adapter.adaptar_sql("SELECT uso_ia_academico, COUNT(*) as cantidad FROM cuiag_respuestas GROUP BY uso_ia_academico"))
             por_uso_ia = {row['uso_ia_academico']: row['cantidad'] for row in cursor.fetchall()}
 
             # Distribución por frecuencia de uso
-            cursor.execute("SELECT frecuencia_uso, COUNT(*) as cantidad FROM cuiag_respuestas GROUP BY frecuencia_uso")
+            cursor.execute(db_adapter.adaptar_sql("SELECT frecuencia_uso, COUNT(*) as cantidad FROM cuiag_respuestas GROUP BY frecuencia_uso"))
             por_frecuencia = {row['frecuencia_uso']: row['cantidad'] for row in cursor.fetchall()}
 
             # Promedio de edad
-            cursor.execute("SELECT AVG(edad), MIN(edad), MAX(edad) FROM cuiag_respuestas")
+            cursor.execute(db_adapter.adaptar_sql("SELECT AVG(edad), MIN(edad), MAX(edad) FROM cuiag_respuestas"))
             fila_edad = cursor.fetchone()
             promedio_edad = round(fila_edad[0] or 0, 1)
             min_edad = fila_edad[1] or 0
@@ -531,11 +469,11 @@ class FACSAHTTPHandler(SimpleHTTPRequestHandler):
             frecuencias_items = {}
             for i in range(1, 41):
                 col = f"item_{i}"
-                cursor.execute(f"""
+                cursor.execute(db_adapter.adaptar_sql(f"""
                 SELECT {col} as valor, COUNT(*) as cant 
                 FROM cuiag_respuestas 
                 GROUP BY {col}
-                """)
+                """))
                 conteo = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
                 for r in cursor.fetchall():
                     conteo[r['valor']] = r['cant']
@@ -546,7 +484,7 @@ class FACSAHTTPHandler(SimpleHTTPRequestHandler):
                 }
 
                 # Cálculo de media aritmética descriptiva del reactivo
-                cursor.execute(f"SELECT AVG({col}) FROM cuiag_respuestas")
+                cursor.execute(db_adapter.adaptar_sql(f"SELECT AVG({col}) FROM cuiag_respuestas"))
                 media = round(cursor.fetchone()[0] or 0, 2)
 
                 frecuencias_items[i] = {
@@ -558,7 +496,7 @@ class FACSAHTTPHandler(SimpleHTTPRequestHandler):
                 }
 
             # Configuración actual
-            cursor.execute("SELECT clave, valor FROM cuiag_config")
+            cursor.execute(db_adapter.adaptar_sql("SELECT clave, valor FROM cuiag_config"))
             config = dict(cursor.fetchall())
             conn.close()
 
@@ -594,12 +532,7 @@ class FACSAHTTPHandler(SimpleHTTPRequestHandler):
             return
 
         try:
-            conn = sqlite3.connect(DB_PATH)
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM cuiag_respuestas ORDER BY timestamp DESC")
-            filas = cursor.fetchall()
-            conn.close()
+            filas = db_adapter.obtener_todas_las_respuestas()
 
             # Preparar CSV en memoria con BOM UTF-8 para apertura correcta en Microsoft Excel
             output = io.StringIO()
@@ -778,11 +711,14 @@ class FACSAHTTPHandler(SimpleHTTPRequestHandler):
             return
 
         try:
-            conn = sqlite3.connect(DB_PATH)
-            conn.row_factory = sqlite3.Row
+            conn = db_adapter.obtener_conexion()
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM cuiag_auditoria_admin ORDER BY timestamp DESC LIMIT 100")
-            filas = [dict(f) for f in cursor.fetchall()]
+            cursor.execute(db_adapter.adaptar_sql("SELECT * FROM cuiag_auditoria_admin ORDER BY timestamp DESC LIMIT 100"))
+            if hasattr(cursor, 'description') and cursor.description:
+                nombres = [desc[0] for desc in cursor.description]
+                filas = [dict(zip(nombres, f)) for f in cursor.fetchall()]
+            else:
+                filas = [dict(f) for f in cursor.fetchall()]
             conn.close()
 
             self._responder_json(200, {"ok": True, "registros": filas})
@@ -800,19 +736,19 @@ class FACSAHTTPHandler(SimpleHTTPRequestHandler):
             body_bytes = self.rfile.read(content_length)
             datos = json.loads(body_bytes.decode('utf-8'))
 
-            conn = sqlite3.connect(DB_PATH)
+            conn = db_adapter.obtener_conexion()
             cursor = conn.cursor()
 
             if 'recepcion_activa' in datos:
                 val = "1" if datos['recepcion_activa'] else "0"
-                cursor.execute("INSERT OR REPLACE INTO cuiag_config (clave, valor) VALUES ('recepcion_activa', ?)", (val,))
+                cursor.execute(db_adapter.adaptar_sql("INSERT OR REPLACE INTO cuiag_config (clave, valor) VALUES ('recepcion_activa', ?)"), (val,))
 
             if 'confirmacion_aprobacion_institucional' in datos:
                 val = "1" if datos['confirmacion_aprobacion_institucional'] else "0"
-                cursor.execute("INSERT OR REPLACE INTO cuiag_config (clave, valor) VALUES ('confirmacion_aprobacion_institucional', ?)", (val,))
+                cursor.execute(db_adapter.adaptar_sql("INSERT OR REPLACE INTO cuiag_config (clave, valor) VALUES ('confirmacion_aprobacion_institucional', ?)"), (val,))
 
             if 'mensaje_inactivo' in datos:
-                cursor.execute("INSERT OR REPLACE INTO cuiag_config (clave, valor) VALUES ('mensaje_inactivo', ?)", (str(datos['mensaje_inactivo'])[:300],))
+                cursor.execute(db_adapter.adaptar_sql("INSERT OR REPLACE INTO cuiag_config (clave, valor) VALUES ('mensaje_inactivo', ?)"), (str(datos['mensaje_inactivo'])[:300],))
 
             conn.commit()
             conn.close()
@@ -846,7 +782,7 @@ def iniciar_servidor():
     print("  --------------------------------------------------------------")
     print(f"  💻  Tu acceso local en esta PC:  http://localhost:{PORT}/")
     print(f"  🔐  Panel de Investigador (Admin): http://localhost:{PORT}/admin")
-    print(f"  📂  Base de datos SQLite:         {DB_PATH}")
+    print(f"  💾  Motor de Base de Datos:       {db_adapter.obtener_tipo_bd()}")
     print("=" * 68)
     try:
         httpd.serve_forever()
