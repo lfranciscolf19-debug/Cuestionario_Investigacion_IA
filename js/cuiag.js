@@ -5,7 +5,7 @@
 // Universidad Juárez del Estado de Durango
 // =============================================================================
 
-(function() {
+(function () {
   'use strict';
 
   const VERSION_INSTRUMENTO = "1.0-preliminar-expertos";
@@ -126,7 +126,7 @@
   // ===========================================================================
   // INICIALIZACIÓN Y APERTURA DEL MÓDULO PARA ESTUDIANTES
   // ===========================================================================
-  window.abrirCuestionarioEstudiantes = function() {
+  window.abrirCuestionarioEstudiantes = function () {
     let modulo = document.getElementById('moduloCuestionarioCUIAG');
     if (!modulo || !document.getElementById('cuiagDynamicStepsContainer')) {
       crearContenedorCuestionario();
@@ -143,7 +143,7 @@
     renderizarPasoActual();
   };
 
-  window.cerrarCuestionarioEstudiantes = function() {
+  window.cerrarCuestionarioEstudiantes = function () {
     // Si estamos en la app pura, regresar al paso 0
     CUIAG_STATE.pasoActual = 0;
     renderizarPasoActual();
@@ -174,7 +174,7 @@
         <!-- HÉROE INSTITUCIONAL -->
         <div class="cuiag-hero-card">
           <div class="cuiag-institution-badge">
-            🏛️ FACSA · UJED • Protocolo de Investigación
+            🏛️ FACSA · UJED • Investigación
           </div>
           <h1 class="cuiag-hero-title">Cuestionario CUIAG-CIS</h1>
           <p class="cuiag-hero-subtitle">
@@ -527,9 +527,9 @@
         <!-- LISTA DE REACTIVOS -->
         <div class="cuiag-items-list">
           ${dim.items.map(itemNum => {
-            const resp = respuestas[itemNum];
-            const esRespondido = resp !== undefined && resp !== null && resp !== '';
-            return `
+      const resp = respuestas[itemNum];
+      const esRespondido = resp !== undefined && resp !== null && resp !== '';
+      return `
               <div class="cuiag-item-card ${esRespondido ? 'answered' : ''}" id="cardItem_${itemNum}">
                 <div class="cuiag-item-header">
                   <div class="cuiag-item-number">${itemNum}</div>
@@ -541,19 +541,19 @@
 
                 <div class="cuiag-likert-scale">
                   ${ESCALA_LIKERT.map(esc => {
-                    const isChecked = resp === esc.valor;
-                    return `
+        const isChecked = resp === esc.valor;
+        return `
                       <label class="cuiag-scale-option ${isChecked ? 'selected' : ''}" data-item="${itemNum}" data-val="${esc.valor}">
                         <input type="radio" name="item_${itemNum}" value="${esc.valor}" ${isChecked ? 'checked' : ''}>
                         <div class="cuiag-scale-num">${esc.valor}</div>
                         <div class="cuiag-scale-text">${esc.texto}</div>
                       </label>
                     `;
-                  }).join('')}
+      }).join('')}
                 </div>
               </div>
             `;
-          }).join('')}
+    }).join('')}
         </div>
 
         <div class="cuiag-nav-footer">
@@ -1007,7 +1007,7 @@
   // PANEL ADMINISTRATIVO DE INVESTIGACIÓN (CUIAG-CIS)
   // Accesible únicamente para Superadmin TI y Administrador
   // ===========================================================================
-  window.renderPanelAdminCUIAG = async function() {
+  window.renderPanelAdminCUIAG = async function () {
     const contenedor = document.getElementById('cuiagAdminPanelContent');
     if (!contenedor) return;
 
@@ -1215,10 +1215,10 @@
                     </td>
                   </tr>
                   ${d.items.map(num => {
-                    const it = items[num] || { enunciado: REACTIVOS_OFICIALES[num], porcentajes: {1:0,2:0,3:0,4:0,5:0}, media_original: 0 };
-                    const pct = it.porcentajes || {1:0,2:0,3:0,4:0,5:0};
-                    const esInv = ITEMS_INVERSOS.has(num);
-                    return `
+      const it = items[num] || { enunciado: REACTIVOS_OFICIALES[num], porcentajes: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }, media_original: 0 };
+      const pct = it.porcentajes || { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+      const esInv = ITEMS_INVERSOS.has(num);
+      return `
                       <tr>
                         <td style="font-weight: 800; font-family: 'JetBrains Mono', monospace;">${num}</td>
                         <td>${REACTIVOS_OFICIALES[num]}</td>
@@ -1242,7 +1242,7 @@
                         </td>
                       </tr>
                     `;
-                  }).join('')}
+    }).join('')}
                 `).join('')}
               </tbody>
             </table>
@@ -1272,7 +1272,7 @@
   }
 
   // Descargas de exportación (Excel con Gráficos, CSV, Diccionario)
-  window.descargarExportacionCUIAG = function(tipo) {
+  window.descargarExportacionCUIAG = function (tipo) {
     const rol = window.rolActual || 'admin';
 
     let endpoint = '/api/cuiag/admin/exportar-csv';
@@ -1285,40 +1285,40 @@
       endpoint = '/api/cuiag/admin/exportar-excel';
       defaultFilename = 'cuiag_cis_analisis_graficos.xlsx';
     }
-    
+
     // Realizar fetch con cabeceras de rol y clave de investigador
     const adminKey = window.adminKey || sessionStorage.getItem('fcs_admin_key') || '';
     fetch(endpoint, {
-      headers: { 
+      headers: {
         'X-FACSA-Role': rol,
         'X-FACSA-Key': adminKey
       }
     })
-    .then(response => {
-      if (!response.ok) throw new Error('Error al descargar');
-      const filename = response.headers.get('Content-Disposition')
-        ?.split('filename=')[1]?.replace(/"/g, '') || defaultFilename;
-      return response.blob().then(blob => ({ blob, filename }));
-    })
-    .then(({ blob, filename }) => {
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-      if (typeof mostrarToast === 'function') {
-        mostrarToast('¡Archivo generado y descargado exitosamente!', 'success');
-      }
-    })
-    .catch(err => {
-      alert('Error al descargar: ' + err.message);
-    });
+      .then(response => {
+        if (!response.ok) throw new Error('Error al descargar');
+        const filename = response.headers.get('Content-Disposition')
+          ?.split('filename=')[1]?.replace(/"/g, '') || defaultFilename;
+        return response.blob().then(blob => ({ blob, filename }));
+      })
+      .then(({ blob, filename }) => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+        if (typeof mostrarToast === 'function') {
+          mostrarToast('¡Archivo generado y descargado exitosamente!', 'success');
+        }
+      })
+      .catch(err => {
+        alert('Error al descargar: ' + err.message);
+      });
   };
 
-  window.toggleEstadoRecepcionCUIAG = async function(nuevoEstado) {
+  window.toggleEstadoRecepcionCUIAG = async function (nuevoEstado) {
     const rol = window.rolActual || 'consulta';
     const adminKey = window.adminKey || sessionStorage.getItem('fcs_admin_key') || '';
     if (rol !== 'superadmin' && rol !== 'admin') return;
@@ -1345,7 +1345,7 @@
   };
 
   // Copiar enlace para compartir con alumnos
-  window.copiarEnlaceAlumnos = function(url) {
+  window.copiarEnlaceAlumnos = function (url) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(url).then(() => {
         if (typeof mostrarToast === 'function') {
@@ -1362,7 +1362,7 @@
   };
 
   // Proyectar modal con código QR grande
-  window.mostrarModalQRAlumnos = function(url) {
+  window.mostrarModalQRAlumnos = function (url) {
     let modal = document.getElementById('modalQRAlumnos');
     if (!modal) {
       modal = document.createElement('div');
