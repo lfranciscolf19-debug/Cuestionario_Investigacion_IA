@@ -24,6 +24,11 @@
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
   position: relative;
   overflow: hidden;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 .cuiag-hero-card::after {
@@ -44,31 +49,34 @@
   gap: 8px;
   background: rgba(0, 0, 0, 0.35);
   border: 1px solid rgba(201, 162, 39, 0.5);
-  padding: 6px 14px;
+  padding: 6px 16px;
   border-radius: 30px;
   font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.5px;
   color: #fbbf24;
-  margin-bottom: 1rem;
+  margin: 0 auto 1.1rem auto;
   text-transform: uppercase;
 }
 
 .cuiag-hero-title {
-  font-size: 1.9rem;
+  font-size: 2rem;
   font-weight: 800;
   line-height: 1.25;
   color: #ffffff;
-  margin: 0 0 0.5rem 0;
+  margin: 0 auto 0.6rem auto;
+  text-align: center;
 }
 
 .cuiag-hero-subtitle {
   font-size: 1.05rem;
   color: #e2e8f0;
-  margin: 0 0 1rem 0;
+  margin: 0 auto;
   font-style: italic;
   font-weight: 500;
   max-width: 800px;
+  text-align: center;
+  line-height: 1.5;
 }
 
 .cuiag-privacy-notice-badge {
