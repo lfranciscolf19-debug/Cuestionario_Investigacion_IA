@@ -180,9 +180,6 @@
           <p class="cuiag-hero-subtitle">
             Uso de inteligencia artificial generativa y competencias investigativas en estudiantes del área de la salud.
           </p>
-          <div class="cuiag-privacy-notice-badge">
-            🔒 Participación Anónima (Sin matrícula ni datos personales)
-          </div>
         </div>
 
         <!-- STEPPER / BARRA DE PROGRESO -->
@@ -323,9 +320,6 @@
               <li>Tiempo estimado de llenado: <strong>8 a 10 minutos</strong>.</li>
             </ul>
           </div>
-          <p style="font-size: 0.88rem; color: var(--text-muted);">
-            <em>Nota técnica: Esta versión corresponde a la fase preliminar para revisión de expertos. Su colaboración contribuye directamente a la validación de instrumentos psicométricos en ciencias de la salud.</em>
-          </p>
         </div>
 
         <div class="cuiag-nav-footer">
