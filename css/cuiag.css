@@ -375,12 +375,31 @@
   cursor: pointer;
   font-size: 0.92rem;
   font-weight: 600;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.cuiag-tool-checkbox-card:hover {
+  border-color: #c9a227;
+  transform: translateY(-1px);
+}
+
+.cuiag-tool-checkbox-card.selected {
+  border-color: #c9a227;
+  background: rgba(201, 162, 39, 0.14);
+  box-shadow: 0 0 12px rgba(201, 162, 39, 0.2);
+}
+
+.cuiag-tool-checkbox-card.muted {
+  opacity: 0.4;
+  pointer-events: none;
 }
 
 .cuiag-tool-checkbox-card input[type="checkbox"] {
   width: 18px;
   height: 18px;
   accent-color: #c9a227;
+  cursor: pointer;
 }
 
 /* Reactivos Oficiales del Cuestionario (1 al 40) */
@@ -587,6 +606,19 @@
   box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
 }
 
+.cuiag-btn-danger {
+  background: linear-gradient(135deg, #b91c1c 0%, #ef4444 100%);
+  color: #ffffff;
+  font-weight: 800;
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.35);
+}
+
+.cuiag-btn-danger:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
 .cuiag-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -761,3 +793,111 @@
   border-radius: 3px;
   margin-right: 4px;
 }
+
+/* ==========================================================================
+   CONTROL DE RECEPCIÓN DE RESPUESTAS & MODAL ADMINISTRATIVO
+   ========================================================================== */
+.cuiag-reception-card {
+  border-radius: 16px;
+  padding: 1.4rem 1.6rem;
+  margin-bottom: 1.8rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  transition: all 0.3s ease;
+}
+
+.cuiag-reception-card.active {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.14) 0%, rgba(15, 23, 42, 0.95) 100%);
+  border: 2px solid #10b981;
+  box-shadow: 0 8px 26px rgba(16, 185, 129, 0.18);
+}
+
+.cuiag-reception-card.closed {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(15, 23, 42, 0.95) 100%);
+  border: 2px solid #ef4444;
+  box-shadow: 0 8px 26px rgba(239, 68, 68, 0.22);
+}
+
+.cuiag-reception-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.cuiag-reception-badge.active {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+.cuiag-reception-badge.closed {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+/* Modal Emergente de Control de Recepción */
+.cuiag-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(11, 15, 25, 0.82);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.2rem;
+  animation: cuiagFadeIn 0.2s ease-out;
+}
+
+.cuiag-modal-dialog {
+  background: var(--card-bg, #1e293b);
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.15));
+  border-radius: 20px;
+  max-width: 540px;
+  width: 100%;
+  padding: 2.2rem 2rem;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  position: relative;
+  animation: cuiagZoomIn 0.25s ease-out;
+}
+
+@keyframes cuiagZoomIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.cuiag-modal-close-btn {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.15));
+  color: var(--text-muted, #94a3b8);
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  transition: all 0.2s;
+}
+
+.cuiag-modal-close-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  border-color: #ef4444;
+}
+

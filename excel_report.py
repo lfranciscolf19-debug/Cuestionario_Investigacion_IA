@@ -135,7 +135,8 @@ def generar_excel_cuiag(db_path):
     # Encabezados de columnas (Fila 4)
     encabezados = [
         "Folio Técnico", "Fecha y Hora", "Carrera", "Edad",
-        "Uso IA Académico", "Herramientas IA", "Frecuencia General",
+        "Uso IA Académico", "Frecuencia General",
+        "Herramientas IA", "Tipo Versión IA", "Paga Suscripción", "Versiones Pago", "Tiempo Uso IA",
         "Versión", "Estado"
     ]
     # 40 reactivos originales
@@ -159,11 +160,11 @@ def generar_excel_cuiag(db_path):
         cell.font = font_header
         cell.alignment = align_center
         cell.border = border_thin
-        if col_idx <= 9:
+        if col_idx <= 13:
             cell.fill = fill_header_navy
-        elif col_idx <= 49:
-            cell.fill = fill_header_crimson
         elif col_idx <= 53:
+            cell.fill = fill_header_crimson
+        elif col_idx <= 57:
             cell.fill = fill_header_gold
         else:
             cell.fill = fill_header_navy
@@ -173,9 +174,16 @@ def generar_excel_cuiag(db_path):
         ws_data.row_dimensions[r_idx].height = 20
         is_zebra = (r_idx % 2 == 0)
 
+        f_keys = f.keys()
+        tipo_ver = f["tipo_version_ia"] if "tipo_version_ia" in f_keys else ""
+        paga_susc = f["paga_suscripcion_ia"] if "paga_suscripcion_ia" in f_keys else ""
+        ver_pago = f["versiones_pago_ia"] if "versiones_pago_ia" in f_keys else "[]"
+        tiempo_u = f["tiempo_uso_ia"] if "tiempo_uso_ia" in f_keys else ""
+
         fila_valores = [
             f["id"], f["timestamp"], f["carrera"], f["edad"],
-            f["uso_ia_academico"], f["herramientas_ia"], f["frecuencia_uso"],
+            f["uso_ia_academico"], f["frecuencia_uso"],
+            f["herramientas_ia"], tipo_ver, paga_susc, ver_pago, tiempo_u,
             f["version_instrumento"], f["estado"]
         ]
 
@@ -211,9 +219,9 @@ def generar_excel_cuiag(db_path):
             c.border = border_thin
             if is_zebra:
                 c.fill = fill_zebra
-            if c_idx in [3, 5, 7]:
+            if c_idx in [3, 4, 5, 6, 8, 9, 11, 12, 13]:
                 c.alignment = align_center
-            elif c_idx == 4 or c_idx >= 10:
+            elif c_idx >= 14:
                 c.alignment = align_center
             else:
                 c.alignment = align_left
@@ -221,11 +229,13 @@ def generar_excel_cuiag(db_path):
     # Auto-ajuste de anchos de columnas
     for col in ws_data.columns:
         col_letter = get_column_letter(col[0].column)
-        if col[0].column in [1, 2, 6]:
-            ws_data.column_dimensions[col_letter].width = 22
-        elif col[0].column <= 9:
+        if col[0].column in [1, 2, 7, 10]:
+            ws_data.column_dimensions[col_letter].width = 24
+        elif col[0].column in [8, 9, 11]:
+            ws_data.column_dimensions[col_letter].width = 20
+        elif col[0].column <= 13:
             ws_data.column_dimensions[col_letter].width = 16
-        elif col[0].column <= 49:
+        elif col[0].column <= 53:
             ws_data.column_dimensions[col_letter].width = 9
         else:
             ws_data.column_dimensions[col_letter].width = 18
@@ -497,15 +507,19 @@ def generar_excel_cuiag(db_path):
         c.alignment = align_center
 
     row_d_idx = 4
-    # Generales
+    # Generales y Complementarias IA
     generales = [
         ("id", "-", "Identificador", "Folio técnico aleatorio anónimo", "No", "Texto (UUID)", "Sin recodificación"),
         ("timestamp", "-", "Registro", "Marca temporal ISO-8601", "No", "Fecha/Hora", "Sin recodificación"),
         ("carrera", "-", "Datos Generales", "Licenciatura cursada (Medicina, Psicología, Nutrición)", "No", "Categórica", "Sin recodificación"),
         ("edad", "-", "Datos Generales", "Años cumplidos", "No", "Entero (17-99)", "Sin recodificación"),
         ("uso_ia_academico", "-", "Datos Generales", "¿Has utilizado herramientas de IA con fines académicos?", "No", "Dicotómica (Sí/No)", "Sin recodificación"),
-        ("herramientas_ia", "-", "Datos Generales", "Herramientas de IA generativa utilizadas", "No", "JSON Array", "Sin recodificación"),
-        ("frecuencia_uso", "-", "Datos Generales", "Frecuencia general de uso", "No", "Ordinal 5 puntos", "Sin recodificación")
+        ("frecuencia_uso", "-", "Datos Generales", "Frecuencia general de uso de herramientas de IA", "No", "Ordinal 5 puntos", "Sin recodificación"),
+        ("herramientas_ia", "-", "Preguntas Complementarias IA", "¿Cuáles herramientas de IA generativa utilizas con fines académicos?", "No", "JSON Array", "Sin recodificación"),
+        ("tipo_version_ia", "-", "Preguntas Complementarias IA", "¿Qué tipo de versión utilizas habitualmente?", "No", "Categórica", "Sin recodificación"),
+        ("paga_suscripcion_ia", "-", "Preguntas Complementarias IA", "¿Pagas personalmente alguna suscripción para utilizar herramientas de IA?", "No", "Categórica", "Sin recodificación"),
+        ("versiones_pago_ia", "-", "Preguntas Complementarias IA", "Si utilizas versiones de pago, ¿cuáles?", "No", "JSON Array", "Sin recodificación"),
+        ("tiempo_uso_ia", "-", "Preguntas Complementarias IA", "¿Desde hace cuánto tiempo utilizas herramientas de IA?", "No", "Ordinal", "Sin recodificación")
     ]
     for gen in generales:
         ws_dict.row_dimensions[row_d_idx].height = 18

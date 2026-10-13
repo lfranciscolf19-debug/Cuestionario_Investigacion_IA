@@ -12,7 +12,7 @@
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
   <!-- Estilos del Cuestionario e Identidad Institucional -->
-  <link rel="stylesheet" href="css/cuiag.css?v=60">
+  <link rel="stylesheet" href="css/cuiag.css?v=70">
   <style>
     :root {
       --bg-main: #0b0f19;
@@ -342,6 +342,9 @@
     </div>
 
     <div class="header-actions">
+      <button type="button" class="btn-toggle-theme" id="btnAdminShortcut" onclick="window.abrirModalControlRecepcion()" style="background: rgba(201, 162, 39, 0.15); border-color: rgba(201, 162, 39, 0.45); color: #fbbf24; font-weight: 700;" title="Panel de control para abrir o cerrar recepción de respuestas">
+        ⚙️ Control de Respuestas
+      </button>
       <button type="button" class="btn-toggle-theme" id="btnToggleTheme" onclick="alternarTemaVisual()">
         ☀️ Día
       </button>
@@ -368,7 +371,7 @@
           <div class="cuiag-stepper-wrapper" id="cuiagStepperBox">
             <div class="cuiag-progress-header">
               <span class="cuiag-progress-step-name" id="cuiagStepNameLabel">
-                📍 Paso 1 de 10: Presentación y Propósito
+                📍 Paso 1 de 11: Presentación y Propósito
               </span>
               <span class="cuiag-progress-percent" id="cuiagProgressPercentLabel">0%</span>
             </div>
@@ -430,9 +433,9 @@
   <div class="toast-container" id="toastContainer"></div>
 
   <!-- SCRIPTS DEL CUESTIONARIO -->
-  <script src="js/data.js?v=55"></script>
-  <script src="js/audio.js?v=55"></script>
-  <script src="js/cuiag.js?v=55"></script>
+  <script src="js/data.js?v=70"></script>
+  <script src="js/audio.js?v=70"></script>
+  <script src="js/cuiag.js?v=71"></script>
 
   <script>
     document.addEventListener('DOMContentLoaded', () => {

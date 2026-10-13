@@ -103,15 +103,22 @@
 
   // Estado del Wizard del Estudiante
   const CUIAG_STATE = {
-    pasoActual: 0, // 0: Presentación, 1: Consentimiento, 2: Datos Generales, 3..8: Dimensiones 1..6, 9: Revisión, 10: Fin
+    pasoActual: 0, // 0: Presentación, 1: Consentimiento, 2: Datos Generales, 3: Preguntas IA, 4..9: Dimensiones 1..6, 10: Revisión, 11: Fin
     consentimientoAceptado: null,
     datosGenerales: {
       carrera: '',
       edad: '',
       uso_ia_academico: '',
-      herramientas_ia: [],
-      otra_herramienta: '',
       frecuencia_uso: ''
+    },
+    preguntasIA: {
+      herramientas: [],
+      otra_herramienta: '',
+      tipo_version: '',
+      paga_suscripcion: '',
+      versiones_pago: [],
+      otra_suscripcion: '',
+      tiempo_uso: ''
     },
     itemsRespuestas: {}, // { 1: 5, 2: 4, ... }
     tokenEnvio: null,
@@ -126,7 +133,7 @@
   // ===========================================================================
   // INICIALIZACIÓN Y APERTURA DEL MÓDULO PARA ESTUDIANTES
   // ===========================================================================
-  window.abrirCuestionarioEstudiantes = function () {
+  window.abrirCuestionarioEstudiantes = async function () {
     let modulo = document.getElementById('moduloCuestionarioCUIAG');
     if (!modulo || !document.getElementById('cuiagDynamicStepsContainer')) {
       crearContenedorCuestionario();
@@ -138,6 +145,22 @@
     // Iniciar token de sesión anónimo si no existe
     if (!CUIAG_STATE.tokenEnvio) {
       CUIAG_STATE.tokenEnvio = generarTokenUUID();
+    }
+
+    // Verificar estado oficial de recepción con el servidor
+    try {
+      const res = await fetch('/api/cuiag/estado');
+      if (res.ok) {
+        const est = await res.json();
+        if (est.recepcion_activa === false || est.activo === false) {
+          CUIAG_STATE.pasoActual = 98; // Estado cerrado
+          CUIAG_STATE.mensajeCerrado = est.mensaje || 'La recepción de respuestas se encuentra actualmente pausada por el comité de investigación.';
+          renderizarPasoActual();
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn('Verificación de estado offline o local:', e);
     }
 
     renderizarPasoActual();
@@ -219,19 +242,25 @@
         container.innerHTML = renderPaso2DatosGenerales();
         break;
       case 3:
+        container.innerHTML = renderPaso3PreguntasIA();
+        break;
       case 4:
       case 5:
       case 6:
       case 7:
       case 8:
-        const dimIndex = CUIAG_STATE.pasoActual - 3;
+      case 9:
+        const dimIndex = CUIAG_STATE.pasoActual - 4;
         container.innerHTML = renderPasoDimension(DIMENSIONES[dimIndex]);
         break;
-      case 9:
-        container.innerHTML = renderPaso9Revision();
-        break;
       case 10:
-        container.innerHTML = renderPaso10Confirmacion();
+        container.innerHTML = renderPaso10Revision();
+        break;
+      case 11:
+        container.innerHTML = renderPaso11Confirmacion();
+        break;
+      case 98: // Recepción cerrada por el administrador
+        container.innerHTML = renderPasoCerrado(CUIAG_STATE.mensajeCerrado);
         break;
       case 99: // No aceptó consentimiento
         container.innerHTML = renderPasoConsentimientoRechazado();
@@ -246,14 +275,14 @@
     const stepperBox = document.getElementById('cuiagStepperBox');
     if (!stepperBox) return;
 
-    if (CUIAG_STATE.pasoActual === 10 || CUIAG_STATE.pasoActual === 99) {
+    if (CUIAG_STATE.pasoActual === 11 || CUIAG_STATE.pasoActual === 98 || CUIAG_STATE.pasoActual === 99) {
       stepperBox.style.display = 'none';
       return;
     }
     stepperBox.style.display = 'block';
 
-    const totalPasos = 10; // 0 a 9
-    const pasoActual = Math.min(CUIAG_STATE.pasoActual, 9);
+    const totalPasos = 11; // 0 a 10
+    const pasoActual = Math.min(CUIAG_STATE.pasoActual, 10);
     const porcentaje = Math.round((pasoActual / (totalPasos - 1)) * 100);
 
     const fill = document.getElementById('cuiagProgressBarFill');
@@ -267,7 +296,8 @@
       "Presentación",
       "Consentimiento",
       "Datos Generales",
-      "Dimensión 1 (Uso de IA)",
+      "Preguntas IA",
+      "Dimensión 1 (Uso)",
       "Dimensión 2 (Alfabetización)",
       "Dimensión 3 (Crítica)",
       "Dimensión 4 (Ética)",
@@ -277,7 +307,7 @@
     ];
 
     if (lblName) {
-      lblName.textContent = `📍 Paso ${pasoActual + 1} de 10: ${nombresPasos[pasoActual] || ''}`;
+      lblName.textContent = `📍 Paso ${pasoActual + 1} de 11: ${nombresPasos[pasoActual] || ''}`;
     }
 
     const pillsStrip = document.getElementById('cuiagStepsPillsStrip');
@@ -346,7 +376,7 @@
 
         <div class="cuiag-consent-box">
           <p style="margin: 0; font-style: italic;">
-            "Su participación en este cuestionario es voluntaria y anónima. No escriba su nombre ni matrícula. Puede decidir no participar o dejar de responder en cualquier momento sin consecuencias académicas. La información será utilizada con fines académicos y de investigación, conforme al protocolo autorizado y al aviso de privacidad aplicable. La aplicación del cuestionario se realizará únicamente después de obtener las autorizaciones institucionales y el consentimiento informado correspondiente."
+            "Su participación en este cuestionario es anónima. La información será utilizada con fines académicos y de investigación, conforme al protocolo autorizado y al aviso de privacidad aplicable. La aplicación del cuestionario se realizará únicamente después de obtener las autorizaciones institucionales y el consentimiento informado correspondiente."
           </p>
         </div>
 
@@ -396,6 +426,37 @@
     `;
   }
 
+  // Paso Recepción Cerrada / Pausada por el Administrador
+  function renderPasoCerrado(mensaje) {
+    return `
+      <div class="cuiag-section-card active" style="text-align: center; padding: 3.5rem 2rem; border-top: 4px solid #ef4444;">
+        <div style="font-size: 4rem; margin-bottom: 1.2rem;">🛑</div>
+        <div class="cuiag-reception-badge closed" style="margin-bottom: 14px; font-size: 0.85rem; padding: 6px 16px;">
+          🔒 Recepción de Respuestas Concluida
+        </div>
+        <h2 class="cuiag-section-title" style="color: var(--text-main); font-size: 1.85rem; margin-bottom: 1rem;">
+          Cuestionario No Disponible
+        </h2>
+        <p style="max-width: 640px; margin: 1rem auto; line-height: 1.75; color: var(--text-main); font-size: 1.05rem;">
+          ${mensaje || 'El periodo de recepción de respuestas para el Cuestionario CUIAG-CIS ha concluido o se encuentra actualmente en pausa por el Comité de Investigación.'}
+        </p>
+        <div style="max-width: 580px; margin: 1.8rem auto; padding: 1.3rem; background: rgba(15, 23, 42, 0.65); border: 1px solid var(--border-color); border-radius: 14px; font-size: 0.88rem; color: var(--text-muted); text-align: left;">
+          <div style="font-weight: 700; color: #fbbf24; margin-bottom: 8px;">ℹ️ Información para Estudiantes:</div>
+          <ul style="margin: 0; padding-left: 1.2rem; line-height: 1.65;">
+            <li>Si ya respondiste anteriormente, tus respuestas ya fueron registradas bajo estricto anonimato y confidencialidad.</li>
+            <li>Agradecemos la colaboración de los estudiantes de Medicina, Psicología y Nutrición de la FACSA · UJED.</li>
+          </ul>
+        </div>
+        <div style="margin-top: 2rem; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+          <button type="button" class="cuiag-btn cuiag-btn-secondary" onclick="window.abrirModalControlRecepcion()">
+            ⚙️ Control / Acceso de Investigador
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+
   // Paso 2: Datos Generales
   function renderPaso2DatosGenerales() {
     const dg = CUIAG_STATE.datosGenerales;
@@ -405,7 +466,7 @@
           <div class="cuiag-section-badge">Sección Inicial</div>
           <h2 class="cuiag-section-title">Datos Generales</h2>
           <p class="cuiag-section-desc">
-            Información sociodemográfica y de contexto sobre herramientas digitales. Recuerde que sus respuestas son anónimas.
+            Información sociodemográfica básica. Recuerde que sus respuestas son anónimas y confidenciales.
           </p>
         </div>
 
@@ -455,36 +516,9 @@
           </div>
         </div>
 
-        <!-- 4. Herramientas utilizadas (Selección múltiple) -->
+        <!-- 4. Frecuencia general de uso -->
         <div class="cuiag-field-group">
-          <label class="cuiag-field-label">4. Herramientas de IA generativa utilizadas (Selecciona todas las que apliquen)</label>
-          <div class="cuiag-tools-grid">
-            <label class="cuiag-tool-checkbox-card">
-              <input type="checkbox" name="checkHerramienta" value="ChatGPT" ${dg.herramientas_ia.includes('ChatGPT') ? 'checked' : ''}>
-              <span>ChatGPT</span>
-            </label>
-            <label class="cuiag-tool-checkbox-card">
-              <input type="checkbox" name="checkHerramienta" value="Gemini" ${dg.herramientas_ia.includes('Gemini') ? 'checked' : ''}>
-              <span>Gemini</span>
-            </label>
-            <label class="cuiag-tool-checkbox-card">
-              <input type="checkbox" name="checkHerramienta" value="Copilot" ${dg.herramientas_ia.includes('Copilot') ? 'checked' : ''}>
-              <span>Copilot</span>
-            </label>
-            <label class="cuiag-tool-checkbox-card" id="cardCheckOtras">
-              <input type="checkbox" name="checkHerramienta" value="Otras" id="checkHerramientaOtras" ${dg.herramientas_ia.some(h => h.startsWith('Otras:')) || dg.herramientas_ia.includes('Otras') ? 'checked' : ''}>
-              <span>Otras</span>
-            </label>
-          </div>
-
-          <div id="boxOtrasHerramientas" style="display: ${dg.herramientas_ia.some(h => h.startsWith('Otras:')) || dg.herramientas_ia.includes('Otras') ? 'block' : 'none'}; margin-top: 10px;">
-            <input type="text" id="inputOtraHerramienta" class="cuiag-input-text" placeholder="Especifica cuál(es) otra(s) herramienta(s) utilizas" value="${dg.otra_herramienta || ''}">
-          </div>
-        </div>
-
-        <!-- 5. Frecuencia general de uso -->
-        <div class="cuiag-field-group">
-          <label class="cuiag-field-label">5. Frecuencia general de uso de herramientas de IA *</label>
+          <label class="cuiag-field-label">4. Frecuencia general de uso de herramientas de IA *</label>
           <div style="display: flex; flex-direction: column; gap: 8px;">
             ${['Nunca', 'Rara vez', 'Algunas veces', 'Frecuentemente', 'Muy frecuentemente'].map(opc => `
               <label class="cuiag-consent-choice ${dg.frecuencia_uso === opc ? 'selected' : ''}" style="padding: 10px 16px;">
@@ -500,6 +534,180 @@
             ⬅️ Anterior
           </button>
           <button type="button" class="cuiag-btn cuiag-btn-primary" id="btnContinuarPaso2">
+            Continuar a Preguntas sobre IA ➡️
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  // Paso 3: Preguntas complementarias sobre el uso de inteligencia artificial
+  function renderPaso3PreguntasIA() {
+    const pia = CUIAG_STATE.preguntasIA;
+    const herrs = pia.herramientas || [];
+    const versPago = pia.versiones_pago || [];
+
+    const tieneOtraHerr = herrs.some(h => h.startsWith('Otra(s):') || h === 'Otra(s)');
+    const tieneOtraPago = versPago.some(v => v.startsWith('Otra suscripción:') || v === 'Otra suscripción');
+    const noUsaIA = herrs.includes('No utilizo herramientas de IA generativa.');
+    const noUsaPago = versPago.includes('No utilizo versiones de pago.');
+
+    return `
+      <div class="cuiag-section-card active">
+        <div class="cuiag-section-header">
+          <div class="cuiag-section-badge">Módulo Específico de IA</div>
+          <h2 class="cuiag-section-title">Preguntas complementarias sobre el uso de inteligencia artificial</h2>
+          <p class="cuiag-section-desc">
+            Por favor responde las siguientes preguntas sobre las herramientas, versiones y modalidades que utilizas con fines académicos.
+          </p>
+        </div>
+
+        <div id="alertErrorPreguntasIA" style="display: none; margin-bottom: 1.5rem; padding: 12px 16px; background: rgba(239, 68, 68, 0.15); border: 1px solid #ef4444; border-radius: 8px; color: #f87171; font-size: 0.88rem; font-weight: 700;"></div>
+
+        <!-- 1. Herramientas de IA generativa utilizadas -->
+        <div class="cuiag-field-group" id="grupoPreguntaIA1">
+          <label class="cuiag-field-label">1. ¿Cuáles herramientas de inteligencia artificial generativa utilizas con fines académicos? *</label>
+          <div class="cuiag-field-helper" style="margin-bottom: 10px;">Puedes seleccionar varias opciones.</div>
+
+          <div class="cuiag-tools-grid">
+            ${[
+              { id: 'ChatGPT', label: 'ChatGPT', icon: '🤖' },
+              { id: 'Google Gemini', label: 'Google Gemini', icon: '✨' },
+              { id: 'Microsoft Copilot', label: 'Microsoft Copilot', icon: '💻' },
+              { id: 'Claude', label: 'Claude', icon: '🧠' },
+              { id: 'Perplexity AI', label: 'Perplexity AI', icon: '🔍' },
+              { id: 'DeepSeek', label: 'DeepSeek', icon: '⚡' }
+            ].map(tool => {
+              const checked = herrs.includes(tool.id);
+              return `
+                <label class="cuiag-tool-checkbox-card ${checked ? 'selected' : ''} ${noUsaIA ? 'muted' : ''}">
+                  <input type="checkbox" name="checkHerramientaComp" value="${tool.id}" ${checked ? 'checked' : ''} ${noUsaIA ? 'disabled' : ''}>
+                  <span>${tool.icon} ${tool.label}</span>
+                </label>
+              `;
+            }).join('')}
+
+            <label class="cuiag-tool-checkbox-card ${tieneOtraHerr ? 'selected' : ''} ${noUsaIA ? 'muted' : ''}" id="cardCheckOtraHerr">
+              <input type="checkbox" name="checkHerramientaComp" value="Otra(s)" id="checkOtraHerrComp" ${tieneOtraHerr ? 'checked' : ''} ${noUsaIA ? 'disabled' : ''}>
+              <span>➕ Otra(s)</span>
+            </label>
+
+            <label class="cuiag-tool-checkbox-card ${noUsaIA ? 'selected' : ''}" id="cardCheckNoUsaIA" style="border-color: rgba(239, 68, 68, 0.4);">
+              <input type="checkbox" name="checkHerramientaComp" value="No utilizo herramientas de IA generativa." id="checkNoUsaIAComp" ${noUsaIA ? 'checked' : ''}>
+              <span style="color: #fca5a5; font-weight: 700;">🚫 No utilizo herramientas de IA generativa.</span>
+            </label>
+          </div>
+
+          <div id="boxOtraHerramientaComp" style="display: ${tieneOtraHerr && !noUsaIA ? 'block' : 'none'}; margin-top: 10px;">
+            <input type="text" id="inputOtraHerramientaComp" class="cuiag-input-text" placeholder="Especifica cuál(es) otra(s) herramienta(s) utilizas" value="${pia.otra_herramienta || ''}">
+          </div>
+        </div>
+
+        <!-- 2. Tipo de versión habitualmente utilizada -->
+        <div class="cuiag-field-group" id="grupoPreguntaIA2">
+          <label class="cuiag-field-label">2. ¿Qué tipo de versión utilizas habitualmente de las herramientas de IA generativa? *</label>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            ${[
+              'Exclusivamente versiones gratuitas.',
+              'Principalmente versiones gratuitas, aunque ocasionalmente utilizo alguna versión de pago.',
+              'Utilizo tanto versiones gratuitas como versiones de pago con frecuencia.',
+              'Principalmente versiones de pago.',
+              'Exclusivamente versiones de pago.',
+              'No estoy seguro(a) del tipo de versión que utilizo.'
+            ].map(opc => `
+              <label class="cuiag-consent-choice ${pia.tipo_version === opc ? 'selected' : ''}" style="padding: 10px 16px;">
+                <input type="radio" name="radioTipoVersionComp" value="${opc}" ${pia.tipo_version === opc ? 'checked' : ''}>
+                <span>${opc}</span>
+              </label>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- 3. Pago personal de suscripción -->
+        <div class="cuiag-field-group" id="grupoPreguntaIA3">
+          <label class="cuiag-field-label">3. ¿Pagas personalmente alguna suscripción para utilizar herramientas de inteligencia artificial generativa? *</label>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            ${[
+              'Sí.',
+              'No, utilizo únicamente versiones gratuitas.',
+              'No personalmente; tengo acceso a una suscripción pagada por otra persona o institución.',
+              'No estoy seguro(a).'
+            ].map(opc => `
+              <label class="cuiag-consent-choice ${pia.paga_suscripcion === opc ? 'selected' : ''}" style="padding: 10px 16px;">
+                <input type="radio" name="radioPagaSuscripcionComp" value="${opc}" ${pia.paga_suscripcion === opc ? 'checked' : ''}>
+                <span>${opc}</span>
+              </label>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- 4. Si utilizas versiones de pago, ¿cuáles? -->
+        <div class="cuiag-field-group" id="grupoPreguntaIA4">
+          <label class="cuiag-field-label">4. Si utilizas versiones de pago, ¿cuáles? *</label>
+          <div class="cuiag-field-helper" style="margin-bottom: 10px;">Puedes seleccionar varias opciones.</div>
+
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            ${[
+              { id: 'ChatGPT Plus, Pro u otro plan de pago.', label: 'ChatGPT Plus, Pro u otro plan de pago.' },
+              { id: 'Google AI Pro, AI Ultra u otro plan de pago.', label: 'Google AI Pro, AI Ultra u otro plan de pago.' },
+              { id: 'Microsoft Copilot con suscripción de pago.', label: 'Microsoft Copilot con suscripción de pago.' },
+              { id: 'Claude Pro, Max u otro plan de pago.', label: 'Claude Pro, Max u otro plan de pago.' },
+              { id: 'Perplexity Pro u otro plan de pago.', label: 'Perplexity Pro u otro plan de pago.' }
+            ].map(item => {
+              const checked = versPago.includes(item.id);
+              return `
+                <label class="cuiag-tool-checkbox-card ${checked ? 'selected' : ''} ${noUsaPago ? 'muted' : ''}">
+                  <input type="checkbox" name="checkVersionPagoComp" value="${item.id}" ${checked ? 'checked' : ''} ${noUsaPago ? 'disabled' : ''}>
+                  <span>💎 ${item.label}</span>
+                </label>
+              `;
+            }).join('')}
+
+            <label class="cuiag-tool-checkbox-card ${tieneOtraPago ? 'selected' : ''} ${noUsaPago ? 'muted' : ''}" id="cardCheckOtraPago">
+              <input type="checkbox" name="checkVersionPagoComp" value="Otra suscripción" id="checkOtraPagoComp" ${tieneOtraPago ? 'checked' : ''} ${noUsaPago ? 'disabled' : ''}>
+              <span>➕ Otra suscripción</span>
+            </label>
+
+            <div id="boxOtraSuscripcionComp" style="display: ${tieneOtraPago && !noUsaPago ? 'block' : 'none'}; margin: 4px 0 6px 20px;">
+              <input type="text" id="inputOtraSuscripcionComp" class="cuiag-input-text" placeholder="Especifica qué otra suscripción de pago utilizas" value="${pia.otra_suscripcion || ''}">
+            </div>
+
+            <label class="cuiag-tool-checkbox-card ${noUsaPago ? 'selected' : ''}" id="cardCheckNoPago" style="border-color: rgba(148, 163, 184, 0.4);">
+              <input type="checkbox" name="checkVersionPagoComp" value="No utilizo versiones de pago." id="checkNoPagoComp" ${noUsaPago ? 'checked' : ''}>
+              <span style="color: #cbd5e1; font-weight: 700;">⚪ No utilizo versiones de pago.</span>
+            </label>
+
+            <label class="cuiag-tool-checkbox-card ${versPago.includes('No conozco el nombre del plan que utilizo.') ? 'selected' : ''} ${noUsaPago ? 'muted' : ''}" id="cardCheckNoConocePlan">
+              <input type="checkbox" name="checkVersionPagoComp" value="No conozco el nombre del plan que utilizo." ${versPago.includes('No conozco el nombre del plan que utilizo.') ? 'checked' : ''} ${noUsaPago ? 'disabled' : ''}>
+              <span>❓ No conozco el nombre del plan que utilizo.</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- 5. Antigüedad en el uso -->
+        <div class="cuiag-field-group" id="grupoPreguntaIA5">
+          <label class="cuiag-field-label">5. ¿Desde hace cuánto tiempo utilizas herramientas de inteligencia artificial generativa para actividades académicas? *</label>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            ${[
+              'Menos de un mes.',
+              'De 1 a 6 meses.',
+              'De 7 a 12 meses.',
+              'Más de un año.',
+              'No las utilizo con fines académicos.'
+            ].map(opc => `
+              <label class="cuiag-consent-choice ${pia.tiempo_uso === opc ? 'selected' : ''}" style="padding: 10px 16px;">
+                <input type="radio" name="radioTiempoUsoComp" value="${opc}" ${pia.tiempo_uso === opc ? 'checked' : ''}>
+                <span>${opc}</span>
+              </label>
+            `).join('')}
+          </div>
+        </div>
+
+        <div class="cuiag-nav-footer">
+          <button type="button" class="cuiag-btn cuiag-btn-secondary" id="btnAtrasPaso3">
+            ⬅️ Anterior (Datos Generales)
+          </button>
+          <button type="button" class="cuiag-btn cuiag-btn-primary" id="btnContinuarPaso3">
             Continuar a los Reactivos ➡️
           </button>
         </div>
@@ -568,14 +776,18 @@
     `;
   }
 
-  // Paso 9: Revisión General Antes del Envío
-  function renderPaso9Revision() {
+  // Paso 10: Revisión General Antes del Envío
+  function renderPaso10Revision() {
     const dg = CUIAG_STATE.datosGenerales;
+    const pia = CUIAG_STATE.preguntasIA;
     const resp = CUIAG_STATE.itemsRespuestas;
     let totalRespondidos = 0;
     for (let i = 1; i <= 40; i++) {
       if (resp[i] !== undefined && resp[i] !== null) totalRespondidos++;
     }
+
+    const herrsResumen = (pia.herramientas && pia.herramientas.length > 0) ? pia.herramientas.join(', ') : 'No especificadas';
+    const pagosResumen = (pia.versiones_pago && pia.versiones_pago.length > 0) ? pia.versiones_pago.join(', ') : 'No especificadas';
 
     return `
       <div class="cuiag-section-card active">
@@ -589,6 +801,8 @@
 
         <div class="cuiag-review-summary-box">
           <h3 style="margin: 0 0 10px 0; font-size: 1.1rem; color: #fbbf24;">📋 Resumen de Captura</h3>
+          
+          <h4 style="margin: 12px 0 6px 0; font-size: 0.92rem; color: #93c5fd; text-transform: uppercase; letter-spacing: 0.5px;">1. Datos Sociodemográficos:</h4>
           <div class="cuiag-review-grid">
             <div class="cuiag-review-item">
               <span style="color: var(--text-muted);">Carrera:</span>
@@ -605,6 +819,30 @@
             <div class="cuiag-review-item">
               <span style="color: var(--text-muted);">Frecuencia de Uso:</span>
               <strong style="color: #fff;">${dg.frecuencia_uso || 'No especificada'}</strong>
+            </div>
+          </div>
+
+          <h4 style="margin: 18px 0 6px 0; font-size: 0.92rem; color: #fbbf24; text-transform: uppercase; letter-spacing: 0.5px;">2. Preguntas Complementarias de IA:</h4>
+          <div class="cuiag-review-grid" style="grid-template-columns: 1fr;">
+            <div class="cuiag-review-item">
+              <span style="color: var(--text-muted);">Herramientas:</span>
+              <strong style="color: #fff;">${herrsResumen}</strong>
+            </div>
+            <div class="cuiag-review-item">
+              <span style="color: var(--text-muted);">Tipo de Versión:</span>
+              <strong style="color: #fff;">${pia.tipo_version || 'No especificado'}</strong>
+            </div>
+            <div class="cuiag-review-item">
+              <span style="color: var(--text-muted);">Suscripción Pagada:</span>
+              <strong style="color: #fff;">${pia.paga_suscripcion || 'No especificado'}</strong>
+            </div>
+            <div class="cuiag-review-item">
+              <span style="color: var(--text-muted);">Versiones de Pago:</span>
+              <strong style="color: #fff;">${pagosResumen}</strong>
+            </div>
+            <div class="cuiag-review-item">
+              <span style="color: var(--text-muted);">Antigüedad de Uso:</span>
+              <strong style="color: #fff;">${pia.tiempo_uso || 'No especificado'}</strong>
             </div>
           </div>
 
@@ -626,7 +864,7 @@
         <div id="alertErrorEnvio" style="display: none; margin-bottom: 1.5rem; padding: 12px 16px; background: rgba(239, 68, 68, 0.15); border: 1px solid #ef4444; border-radius: 8px; color: #f87171; font-size: 0.88rem; font-weight: 700;"></div>
 
         <div class="cuiag-nav-footer">
-          <button type="button" class="cuiag-btn cuiag-btn-secondary" id="btnAtrasPaso9" ${CUIAG_STATE.enviando ? 'disabled' : ''}>
+          <button type="button" class="cuiag-btn cuiag-btn-secondary" id="btnAtrasPaso10" ${CUIAG_STATE.enviando ? 'disabled' : ''}>
             ⬅️ Modificar Respuestas
           </button>
           <button type="button" class="cuiag-btn cuiag-btn-success" id="btnEnviarCuestionarioFinal" ${CUIAG_STATE.enviando ? 'disabled' : ''}>
@@ -637,8 +875,8 @@
     `;
   }
 
-  // Paso 10: Confirmación Exitosa
-  function renderPaso10Confirmacion() {
+  // Paso 11: Confirmación Exitosa
+  function renderPaso11Confirmacion() {
     return `
       <div class="cuiag-success-card">
         <div class="cuiag-success-icon">🎉</div>
@@ -777,19 +1015,6 @@
     const btnC2 = document.getElementById('btnContinuarPaso2');
     if (btnC2) {
       btnC2.addEventListener('click', () => {
-        // Guardar herramientas seleccionadas
-        const herramientas = [];
-        document.querySelectorAll('input[name="checkHerramienta"]:checked').forEach(chk => {
-          if (chk.value === 'Otras') {
-            const extra = (inpOtra && inpOtra.value.trim()) ? inpOtra.value.trim() : 'Otras';
-            herramientas.push(`Otras: ${extra}`);
-          } else {
-            herramientas.push(chk.value);
-          }
-        });
-        CUIAG_STATE.datosGenerales.herramientas_ia = herramientas;
-
-        // Validación
         const errBox = document.getElementById('alertErrorDatosGenerales');
         const dg = CUIAG_STATE.datosGenerales;
 
@@ -814,13 +1039,300 @@
           return;
         }
 
-        errBox.style.display = 'none';
-        CUIAG_STATE.pasoActual = 3; // Dimensión 1
+        // Sugerencia inteligente de autocompletado si el alumno declaró que NO usa IA
+        if (dg.uso_ia_academico === 'No' && CUIAG_STATE.preguntasIA.herramientas.length === 0) {
+          CUIAG_STATE.preguntasIA.herramientas = ['No utilizo herramientas de IA generativa.'];
+          CUIAG_STATE.preguntasIA.tipo_version = 'Exclusivamente versiones gratuitas.';
+          CUIAG_STATE.preguntasIA.paga_suscripcion = 'No, utilizo únicamente versiones gratuitas.';
+          CUIAG_STATE.preguntasIA.versiones_pago = ['No utilizo versiones de pago.'];
+          CUIAG_STATE.preguntasIA.tiempo_uso = 'No las utilizo con fines académicos.';
+        }
+
+        if (errBox) errBox.style.display = 'none';
+        CUIAG_STATE.pasoActual = 3; // Preguntas complementarias de IA
         renderizarPasoActual();
       });
     }
 
-    // Pasos 3 a 8: Dimensiones
+    // Paso 3: Preguntas Complementarias de IA
+    const checksHerr = document.querySelectorAll('input[name="checkHerramientaComp"]');
+    const boxOtraHerr = document.getElementById('boxOtraHerramientaComp');
+    const inpOtraHerr = document.getElementById('inputOtraHerramientaComp');
+
+    checksHerr.forEach(chk => {
+      chk.addEventListener('change', (e) => {
+        const val = e.target.value;
+        const isChecked = e.target.checked;
+        const card = e.target.closest('.cuiag-tool-checkbox-card');
+
+        if (val === 'No utilizo herramientas de IA generativa.') {
+          if (isChecked) {
+            // Desmarcar todas las otras herramientas y atenuarlas
+            checksHerr.forEach(other => {
+              if (other !== chk) {
+                other.checked = false;
+                other.disabled = true;
+                const otherCard = other.closest('.cuiag-tool-checkbox-card');
+                otherCard?.classList.remove('selected');
+                otherCard?.classList.add('muted');
+              }
+            });
+            if (boxOtraHerr) boxOtraHerr.style.display = 'none';
+            if (inpOtraHerr) inpOtraHerr.value = '';
+            CUIAG_STATE.preguntasIA.otra_herramienta = '';
+            CUIAG_STATE.preguntasIA.herramientas = ['No utilizo herramientas de IA generativa.'];
+
+            // Sincronizar sugerencia en Pregunta 5 si no se ha respondido
+            if (!CUIAG_STATE.preguntasIA.tiempo_uso) {
+              const rT = document.querySelector('input[name="radioTiempoUsoComp"][value="No las utilizo con fines académicos."]');
+              if (rT) {
+                rT.checked = true;
+                rT.closest('.cuiag-consent-choice')?.classList.add('selected');
+                CUIAG_STATE.preguntasIA.tiempo_uso = 'No las utilizo con fines académicos.';
+              }
+            }
+          } else {
+            // Reactivar las herramientas
+            checksHerr.forEach(other => {
+              other.disabled = false;
+              other.closest('.cuiag-tool-checkbox-card')?.classList.remove('muted');
+            });
+            CUIAG_STATE.preguntasIA.herramientas = [];
+          }
+        } else {
+          // Si marca una herramienta específica
+          if (isChecked) {
+            const chkNo = document.querySelector('input[name="checkHerramientaComp"][value="No utilizo herramientas de IA generativa."]');
+            if (chkNo) {
+              chkNo.checked = false;
+              chkNo.closest('.cuiag-tool-checkbox-card')?.classList.remove('selected');
+            }
+            if (val === 'Otra(s)') {
+              if (boxOtraHerr) boxOtraHerr.style.display = 'block';
+              if (inpOtraHerr) inpOtraHerr.focus();
+            }
+          } else {
+            if (val === 'Otra(s)' && boxOtraHerr) {
+              boxOtraHerr.style.display = 'none';
+            }
+          }
+        }
+
+        if (isChecked) card?.classList.add('selected');
+        else card?.classList.remove('selected');
+      });
+    });
+
+    if (inpOtraHerr) {
+      inpOtraHerr.addEventListener('input', (e) => {
+        CUIAG_STATE.preguntasIA.otra_herramienta = e.target.value;
+      });
+    }
+
+    const radiosTipoVer = document.querySelectorAll('input[name="radioTipoVersionComp"]');
+    radiosTipoVer.forEach(r => {
+      r.addEventListener('change', (e) => {
+        CUIAG_STATE.preguntasIA.tipo_version = e.target.value;
+        const parentGrp = r.closest('#grupoPreguntaIA2');
+        if (parentGrp) {
+          parentGrp.querySelectorAll('.cuiag-consent-choice').forEach(c => c.classList.remove('selected'));
+        }
+        r.closest('.cuiag-consent-choice')?.classList.add('selected');
+
+        // Lógica condicional: Si es exclusivamente gratuita y no paga personalmente, sincronizar en P4
+        if (e.target.value === 'Exclusivamente versiones gratuitas.' && CUIAG_STATE.preguntasIA.paga_suscripcion === 'No, utilizo únicamente versiones gratuitas.') {
+          const chkNoPago = document.querySelector('input[name="checkVersionPagoComp"][value="No utilizo versiones de pago."]');
+          if (chkNoPago && !chkNoPago.checked) {
+            document.querySelectorAll('input[name="checkVersionPagoComp"]').forEach(c => {
+              c.checked = false;
+              c.closest('.cuiag-tool-checkbox-card')?.classList.remove('selected');
+            });
+            chkNoPago.checked = true;
+            chkNoPago.closest('.cuiag-tool-checkbox-card')?.classList.add('selected');
+            CUIAG_STATE.preguntasIA.versiones_pago = ['No utilizo versiones de pago.'];
+          }
+        }
+      });
+    });
+
+    const radiosPagaSusc = document.querySelectorAll('input[name="radioPagaSuscripcionComp"]');
+    radiosPagaSusc.forEach(r => {
+      r.addEventListener('change', (e) => {
+        CUIAG_STATE.preguntasIA.paga_suscripcion = e.target.value;
+        const parentGrp = r.closest('#grupoPreguntaIA3');
+        if (parentGrp) {
+          parentGrp.querySelectorAll('.cuiag-consent-choice').forEach(c => c.classList.remove('selected'));
+        }
+        r.closest('.cuiag-consent-choice')?.classList.add('selected');
+
+        // Lógica condicional: Si no paga personalmente y usa exclusivamente gratuitas, sincronizar en P4
+        if (e.target.value === 'No, utilizo únicamente versiones gratuitas.' && CUIAG_STATE.preguntasIA.tipo_version === 'Exclusivamente versiones gratuitas.') {
+          const chkNoPago = document.querySelector('input[name="checkVersionPagoComp"][value="No utilizo versiones de pago."]');
+          if (chkNoPago && !chkNoPago.checked) {
+            document.querySelectorAll('input[name="checkVersionPagoComp"]').forEach(c => {
+              c.checked = false;
+              c.closest('.cuiag-tool-checkbox-card')?.classList.remove('selected');
+            });
+            chkNoPago.checked = true;
+            chkNoPago.closest('.cuiag-tool-checkbox-card')?.classList.add('selected');
+            CUIAG_STATE.preguntasIA.versiones_pago = ['No utilizo versiones de pago.'];
+          }
+        }
+      });
+    });
+
+    const checksPago = document.querySelectorAll('input[name="checkVersionPagoComp"]');
+    const boxOtraPago = document.getElementById('boxOtraSuscripcionComp');
+    const inpOtraPago = document.getElementById('inputOtraSuscripcionComp');
+
+    checksPago.forEach(chk => {
+      chk.addEventListener('change', (e) => {
+        const val = e.target.value;
+        const isChecked = e.target.checked;
+        const card = e.target.closest('.cuiag-tool-checkbox-card');
+
+        if (val === 'No utilizo versiones de pago.') {
+          if (isChecked) {
+            // Desmarcar las versiones de pago y atenuarlas
+            checksPago.forEach(other => {
+              if (other !== chk) {
+                other.checked = false;
+                other.disabled = true;
+                const otherCard = other.closest('.cuiag-tool-checkbox-card');
+                otherCard?.classList.remove('selected');
+                otherCard?.classList.add('muted');
+              }
+            });
+            if (boxOtraPago) boxOtraPago.style.display = 'none';
+            if (inpOtraPago) inpOtraPago.value = '';
+            CUIAG_STATE.preguntasIA.otra_suscripcion = '';
+            CUIAG_STATE.preguntasIA.versiones_pago = ['No utilizo versiones de pago.'];
+          } else {
+            checksPago.forEach(other => {
+              other.disabled = false;
+              other.closest('.cuiag-tool-checkbox-card')?.classList.remove('muted');
+            });
+            CUIAG_STATE.preguntasIA.versiones_pago = [];
+          }
+        } else {
+          // Si marca una versión de pago específica o 'No conozco...'
+          if (isChecked) {
+            const chkNoPago = document.querySelector('input[name="checkVersionPagoComp"][value="No utilizo versiones de pago."]');
+            if (chkNoPago) {
+              chkNoPago.checked = false;
+              chkNoPago.closest('.cuiag-tool-checkbox-card')?.classList.remove('selected');
+            }
+            if (val === 'Otra suscripción') {
+              if (boxOtraPago) boxOtraPago.style.display = 'block';
+              if (inpOtraPago) inpOtraPago.focus();
+            }
+          } else {
+            if (val === 'Otra suscripción' && boxOtraPago) {
+              boxOtraPago.style.display = 'none';
+            }
+          }
+        }
+
+        if (isChecked) card?.classList.add('selected');
+        else card?.classList.remove('selected');
+      });
+    });
+
+    if (inpOtraPago) {
+      inpOtraPago.addEventListener('input', (e) => {
+        CUIAG_STATE.preguntasIA.otra_suscripcion = e.target.value;
+      });
+    }
+
+    const radiosTiempo = document.querySelectorAll('input[name="radioTiempoUsoComp"]');
+    radiosTiempo.forEach(r => {
+      r.addEventListener('change', (e) => {
+        CUIAG_STATE.preguntasIA.tiempo_uso = e.target.value;
+        const parentGrp = r.closest('#grupoPreguntaIA5');
+        if (parentGrp) {
+          parentGrp.querySelectorAll('.cuiag-consent-choice').forEach(c => c.classList.remove('selected'));
+        }
+        r.closest('.cuiag-consent-choice')?.classList.add('selected');
+      });
+    });
+
+    const btnA3 = document.getElementById('btnAtrasPaso3');
+    if (btnA3) {
+      btnA3.addEventListener('click', () => {
+        CUIAG_STATE.pasoActual = 2; // Regresar a Datos Generales
+        renderizarPasoActual();
+      });
+    }
+
+    const btnC3 = document.getElementById('btnContinuarPaso3');
+    if (btnC3) {
+      btnC3.addEventListener('click', () => {
+        const errBox = document.getElementById('alertErrorPreguntasIA');
+
+        // 1. Herramientas
+        const herrsSel = [];
+        document.querySelectorAll('input[name="checkHerramientaComp"]:checked').forEach(c => {
+          if (c.value === 'Otra(s)') {
+            const extra = (inpOtraHerr && inpOtraHerr.value.trim()) ? inpOtraHerr.value.trim() : 'Otra(s)';
+            herrsSel.push(`Otra(s): ${extra}`);
+          } else {
+            herrsSel.push(c.value);
+          }
+        });
+
+        if (herrsSel.length === 0) {
+          mostrarErrorGenerales(errBox, 'Por favor responde la Pregunta 1 seleccionando al menos una herramienta o la opción "No utilizo...".');
+          document.getElementById('grupoPreguntaIA1')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          return;
+        }
+        CUIAG_STATE.preguntasIA.herramientas = herrsSel;
+
+        // 2. Tipo de versión
+        if (!CUIAG_STATE.preguntasIA.tipo_version) {
+          mostrarErrorGenerales(errBox, 'Por favor responde la Pregunta 2 sobre el tipo de versión que utilizas habitualmente.');
+          document.getElementById('grupoPreguntaIA2')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          return;
+        }
+
+        // 3. Paga suscripción
+        if (!CUIAG_STATE.preguntasIA.paga_suscripcion) {
+          mostrarErrorGenerales(errBox, 'Por favor responde la Pregunta 3 sobre si pagas personalmente alguna suscripción.');
+          document.getElementById('grupoPreguntaIA3')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          return;
+        }
+
+        // 4. Versiones de pago
+        const pagosSel = [];
+        document.querySelectorAll('input[name="checkVersionPagoComp"]:checked').forEach(c => {
+          if (c.value === 'Otra suscripción') {
+            const extra = (inpOtraPago && inpOtraPago.value.trim()) ? inpOtraPago.value.trim() : 'Otra suscripción';
+            pagosSel.push(`Otra suscripción: ${extra}`);
+          } else {
+            pagosSel.push(c.value);
+          }
+        });
+
+        if (pagosSel.length === 0) {
+          mostrarErrorGenerales(errBox, 'Por favor responde la Pregunta 4 seleccionando al menos una opción (o "No utilizo versiones de pago").');
+          document.getElementById('grupoPreguntaIA4')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          return;
+        }
+        CUIAG_STATE.preguntasIA.versiones_pago = pagosSel;
+
+        // 5. Antigüedad en el uso
+        if (!CUIAG_STATE.preguntasIA.tiempo_uso) {
+          mostrarErrorGenerales(errBox, 'Por favor responde la Pregunta 5 sobre el tiempo que llevas utilizando herramientas de IA.');
+          document.getElementById('grupoPreguntaIA5')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          return;
+        }
+
+        if (errBox) errBox.style.display = 'none';
+        CUIAG_STATE.pasoActual = 4; // Dimensión 1
+        renderizarPasoActual();
+      });
+    }
+
+    // Pasos 4 a 9: Dimensiones 1 a 6
     const likertOptions = document.querySelectorAll('.cuiag-scale-option');
     likertOptions.forEach(opt => {
       opt.addEventListener('click', () => {
@@ -850,7 +1362,7 @@
     const btnCDim = document.getElementById('btnContinuarDimension');
     if (btnCDim) {
       btnCDim.addEventListener('click', () => {
-        const dimIndex = CUIAG_STATE.pasoActual - 3;
+        const dimIndex = CUIAG_STATE.pasoActual - 4;
         const dimActual = DIMENSIONES[dimIndex];
         const faltantes = [];
 
@@ -879,8 +1391,8 @@
 
         if (alertErr) alertErr.style.display = 'none';
 
-        if (CUIAG_STATE.pasoActual === 8) {
-          CUIAG_STATE.pasoActual = 9; // Pantalla de Revisión
+        if (CUIAG_STATE.pasoActual === 9) {
+          CUIAG_STATE.pasoActual = 10; // Pantalla de Revisión
         } else {
           CUIAG_STATE.pasoActual++;
         }
@@ -888,11 +1400,11 @@
       });
     }
 
-    // Paso 9: Revisión y Envío Definitivo
-    const btnA9 = document.getElementById('btnAtrasPaso9');
-    if (btnA9) {
-      btnA9.addEventListener('click', () => {
-        CUIAG_STATE.pasoActual = 8; // Regresar a Dimensión 6
+    // Paso 10: Revisión y Envío Definitivo
+    const btnA10 = document.getElementById('btnAtrasPaso10');
+    if (btnA10) {
+      btnA10.addEventListener('click', () => {
+        CUIAG_STATE.pasoActual = 9; // Regresar a Dimensión 6
         renderizarPasoActual();
       });
     }
@@ -941,8 +1453,12 @@
       carrera: CUIAG_STATE.datosGenerales.carrera,
       edad: parseInt(CUIAG_STATE.datosGenerales.edad, 10),
       uso_ia_academico: CUIAG_STATE.datosGenerales.uso_ia_academico,
-      herramientas_ia: CUIAG_STATE.datosGenerales.herramientas_ia,
       frecuencia_uso: CUIAG_STATE.datosGenerales.frecuencia_uso,
+      herramientas_ia: CUIAG_STATE.preguntasIA.herramientas,
+      tipo_version_ia: CUIAG_STATE.preguntasIA.tipo_version,
+      paga_suscripcion_ia: CUIAG_STATE.preguntasIA.paga_suscripcion,
+      versiones_pago_ia: CUIAG_STATE.preguntasIA.versiones_pago,
+      tiempo_uso_ia: CUIAG_STATE.preguntasIA.tiempo_uso,
       items: CUIAG_STATE.itemsRespuestas,
       version_instrumento: VERSION_INSTRUMENTO
     };
@@ -959,11 +1475,23 @@
       const data = await res.json();
 
       if (!res.ok) {
+        if (res.status === 403) {
+          CUIAG_STATE.enviando = false;
+          if (btnEnv) {
+            btnEnv.disabled = false;
+            btnEnv.textContent = '🚀 Confirmar y Enviar Respuestas Definitivamente';
+          }
+          alert(`🛑 Recepción de Respuestas Concluida:\n\n${data.error || 'La recepción de respuestas se encuentra actualmente pausada por el comité de investigación.'}`);
+          CUIAG_STATE.pasoActual = 98;
+          CUIAG_STATE.mensajeCerrado = data.error;
+          renderizarPasoActual();
+          return;
+        }
         throw new Error(data.error || 'Error al guardar respuestas en el servidor.');
       }
 
       CUIAG_STATE.folioConfirmacion = data.id_confirmacion || ('CUIAG-' + Date.now().toString(36).toUpperCase());
-      CUIAG_STATE.pasoActual = 10; // Éxito
+      CUIAG_STATE.pasoActual = 11; // Éxito
       CUIAG_STATE.enviando = false;
       renderizarPasoActual();
 
@@ -985,7 +1513,7 @@
         localStorage.setItem('fcs_cuiag_respuestas_local', JSON.stringify(guardados));
 
         CUIAG_STATE.folioConfirmacion = nuevoId;
-        CUIAG_STATE.pasoActual = 10;
+        CUIAG_STATE.pasoActual = 11;
         CUIAG_STATE.enviando = false;
         renderizarPasoActual();
       } catch (localErr) {
@@ -1092,6 +1620,56 @@
           </div>
         </div>
 
+        <!-- PANEL DESTACADO DE CONTROL DE RECEPCIÓN DE RESPUESTAS -->
+        <div class="cuiag-reception-card ${cfg.recepcion_activa ? 'active' : 'closed'}">
+          <div style="flex: 1; min-width: 290px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+              <span class="cuiag-reception-badge ${cfg.recepcion_activa ? 'active' : 'closed'}">
+                ${cfg.recepcion_activa ? '🟢 RECEPCIÓN ACTIVA' : '🔴 RECEPCIÓN CERRADA'}
+              </span>
+              <span style="font-size: 0.82rem; color: var(--text-muted);">
+                Aprobación Comité: <strong>${cfg.aprobacion_institucional ? '✅ Confirmada' : '⚠️ Pendiente'}</strong>
+              </span>
+            </div>
+            <h3 style="font-size: 1.25rem; font-weight: 800; color: ${cfg.recepcion_activa ? '#34d399' : '#f87171'}; margin-bottom: 4px;">
+              ${cfg.recepcion_activa ? 'El Cuestionario está ABIERTO y Recibiendo Respuestas' : 'El Cuestionario está CERRADO (Ya no se reciben respuestas)'}
+            </h3>
+            <p style="font-size: 0.88rem; color: #cbd5e1; margin: 0; line-height: 1.5;">
+              ${cfg.recepcion_activa 
+                ? 'Los estudiantes pueden responder y enviar el cuestionario con normalidad en este momento.' 
+                : 'El cuestionario está pausado. Quienes abran el cuestionario verán la pantalla avisando que el periodo ha concluido.'}
+            </p>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 10px; align-items: flex-end;">
+            ${cfg.recepcion_activa ? `
+              <button type="button" class="cuiag-btn cuiag-btn-danger" onclick="window.toggleEstadoRecepcionCUIAG(false)" style="padding: 12px 22px; font-size: 0.95rem; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;">
+                🛑 Cerrar Recepción de Respuestas
+              </button>
+            ` : `
+              <button type="button" class="cuiag-btn cuiag-btn-success" onclick="window.toggleEstadoRecepcionCUIAG(true)" style="padding: 12px 22px; font-size: 0.95rem; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;">
+                ▶️ Reabrir Recepción de Respuestas
+              </button>
+            `}
+            <button type="button" class="cuiag-btn cuiag-btn-secondary" onclick="window.alternarEdicionMensajeCierre()" style="padding: 5px 12px; font-size: 0.78rem;">
+              ✏️ Editar Mensaje de Cierre
+            </button>
+          </div>
+        </div>
+
+        <!-- FORMULARIO DESPLEGABLE PARA EDITAR MENSAJE DE CIERRE -->
+        <div id="boxEdicionMensajeCierre" style="display: none; background: rgba(15, 23, 42, 0.85); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.2rem; margin-top: -1.2rem; margin-bottom: 1.8rem;">
+          <label style="display: block; font-size: 0.84rem; font-weight: 700; color: #fbbf24; margin-bottom: 6px;">
+            Mensaje institucional mostrado a los estudiantes cuando el cuestionario esté cerrado:
+          </label>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <input type="text" id="inputMensajeCerradoAdmin" class="cuiag-input-text" style="flex: 1; min-width: 280px;" value="${cfg.mensaje_inactivo || 'La recepción de respuestas se encuentra actualmente pausada por el comité de investigación.'}">
+            <button type="button" class="cuiag-btn cuiag-btn-gold" onclick="window.actualizarMensajeInactivoCUIAG()" style="padding: 10px 18px; font-size: 0.85rem; font-weight: 700;">
+              💾 Guardar Mensaje
+            </button>
+          </div>
+        </div>
+
         <!-- TARJETA DESTACADA: ENLACE Y PROYECCIÓN PARA ALUMNOS -->
         <div style="background: linear-gradient(135deg, rgba(201, 162, 39, 0.14) 0%, rgba(15, 23, 42, 0.95) 100%); border: 1px solid rgba(201, 162, 39, 0.45); border-radius: 14px; padding: 1.3rem 1.5rem; margin-bottom: 1.8rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; box-shadow: 0 6px 20px rgba(0,0,0,0.25);">
           <div style="flex: 1; min-width: 280px;">
@@ -1099,7 +1677,9 @@
               <span style="font-size: 0.78rem; font-weight: 800; text-transform: uppercase; color: #fbbf24; letter-spacing: 0.5px;">
                 📲 ENLACE PARA COMPARTIR CON TUS ALUMNOS
               </span>
-              <span style="background: #10b981; color: #ffffff; font-size: 0.68rem; font-weight: 800; padding: 2px 7px; border-radius: 4px;">LISTO PARA RESPONDER</span>
+              <span style="background: ${cfg.recepcion_activa ? '#10b981' : '#ef4444'}; color: #ffffff; font-size: 0.68rem; font-weight: 800; padding: 2px 7px; border-radius: 4px;">
+                ${cfg.recepcion_activa ? '🟢 RECIBIENDO RESPUESTAS' : '🔴 RECEPCIÓN CERRADA'}
+              </span>
             </div>
             <div style="font-size: 1.18rem; font-weight: 800; color: #ffffff; margin: 6px 0 4px; font-family: 'JetBrains Mono', monospace; word-break: break-all;">
               ${urlAlumnos}
@@ -1114,24 +1694,6 @@
             </button>
             <button type="button" class="cuiag-btn" onclick="window.mostrarModalQRAlumnos('${urlAlumnos}')" style="padding: 10px 18px; font-size: 0.88rem; font-weight: 800; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: #ffffff; box-shadow: 0 4px 14px rgba(59, 130, 246, 0.4);">
               📷 Proyectar Código QR
-            </button>
-          </div>
-        </div>
-
-        <!-- AVISO METODOLÓGICO Y CONTROL DE APROBACIONES -->
-        <div style="background: rgba(11, 42, 91, 0.25); border: 1px solid rgba(59, 130, 246, 0.35); border-radius: 12px; padding: 1.2rem; margin-bottom: 1.8rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
-          <div>
-            <div style="font-weight: 700; color: #60a5fa; font-size: 0.95rem;">
-              🛡️ Control de Recepción & Aprobaciones Institucionales
-            </div>
-            <div style="font-size: 0.82rem; color: var(--text-muted); margin-top: 2px;">
-              Estado actual: <strong>${cfg.recepcion_activa ? '🟢 Recepción Abierta' : '⏸️ Recepción Pausada'}</strong> • 
-              Aprobación de Comité: <strong>${cfg.aprobacion_institucional ? '✅ Confirmada' : '⚠️ Pendiente'}</strong>
-            </div>
-          </div>
-          <div style="display: flex; gap: 10px;">
-            <button type="button" class="cuiag-btn ${cfg.recepcion_activa ? 'cuiag-btn-secondary' : 'cuiag-btn-success'}" onclick="window.toggleEstadoRecepcionCUIAG(${!cfg.recepcion_activa})" style="padding: 6px 14px; font-size: 0.82rem;">
-              ${cfg.recepcion_activa ? '⏸️ Pausar Nuevas Respuestas' : '▶️ Activar Recepción'}
             </button>
           </div>
         </div>
@@ -1318,10 +1880,73 @@
       });
   };
 
-  window.toggleEstadoRecepcionCUIAG = async function (nuevoEstado) {
-    const rol = window.rolActual || 'consulta';
+  window.alternarEdicionMensajeCierre = function () {
+    const box = document.getElementById('boxEdicionMensajeCierre');
+    if (!box) return;
+    box.style.display = box.style.display === 'none' ? 'block' : 'none';
+    if (box.style.display === 'block') {
+      const inp = document.getElementById('inputMensajeCerradoAdmin');
+      if (inp) inp.focus();
+    }
+  };
+
+  window.actualizarMensajeInactivoCUIAG = async function () {
+    const inp = document.getElementById('inputMensajeCerradoAdmin');
+    if (!inp) return;
+    const msg = inp.value.trim();
+    if (!msg) {
+      alert('Por favor ingrese un mensaje descriptivo para los alumnos.');
+      return;
+    }
+
+    const rol = window.rolActual || sessionStorage.getItem('fcs_rol') || 'superadmin';
     const adminKey = window.adminKey || sessionStorage.getItem('fcs_admin_key') || '';
-    if (rol !== 'superadmin' && rol !== 'admin') return;
+
+    try {
+      const res = await fetch('/api/cuiag/admin/config', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-FACSA-Role': rol,
+          'X-FACSA-Key': adminKey
+        },
+        body: JSON.stringify({ mensaje_inactivo: msg })
+      });
+      if (res.ok) {
+        if (typeof mostrarToast === 'function') {
+          mostrarToast('Mensaje de cierre actualizado exitosamente.', 'success');
+        } else {
+          alert('Mensaje de cierre actualizado exitosamente.');
+        }
+      } else {
+        const err = await res.json();
+        alert('Error: ' + (err.error || 'No se pudo guardar el mensaje.'));
+      }
+    } catch (e) {
+      alert('Error de conexión al actualizar mensaje: ' + e.message);
+    }
+  };
+
+  window.toggleEstadoRecepcionCUIAG = async function (nuevoEstado) {
+    const rol = window.rolActual || sessionStorage.getItem('fcs_rol') || 'superadmin';
+    let adminKey = window.adminKey || sessionStorage.getItem('fcs_admin_key') || '';
+
+    if (!adminKey) {
+      const clave = prompt('🔐 Ingrese la contraseña de Investigador / Administrador:');
+      if (!clave) return;
+      adminKey = clave;
+      window.adminKey = clave;
+      sessionStorage.setItem('fcs_admin_key', clave);
+      sessionStorage.setItem('fcs_rol', 'superadmin');
+    }
+
+    const confirmMsg = nuevoEstado 
+      ? '¿Confirmas que deseas REABRIR la recepción de respuestas?\n\nLos estudiantes podrán volver a ingresar y responder el instrumento CUIAG-CIS.'
+      : '¿Confirmas que deseas CERRAR la recepción de respuestas?\n\nA partir de este momento:\n• Ya NO se recibirán más respuestas.\n• Los estudiantes verán un aviso indicando que el cuestionario está cerrado.\n• Las respuestas guardadas hasta hoy se mantienen 100% seguras.';
+
+    if (!confirm(confirmMsg)) {
+      return;
+    }
 
     try {
       const res = await fetch('/api/cuiag/admin/config', {
@@ -1334,13 +1959,170 @@
         body: JSON.stringify({ recepcion_activa: nuevoEstado })
       });
       if (res.ok) {
+        const aviso = nuevoEstado ? '🟢 Recepción de respuestas ACTIVADA.' : '🛑 Recepción de respuestas CERRADA (Ya no se reciben más respuestas).';
         if (typeof mostrarToast === 'function') {
-          mostrarToast(`Recepción de respuestas ${nuevoEstado ? 'activada' : 'pausada'} correctamente.`, 'info');
+          mostrarToast(aviso, nuevoEstado ? 'success' : 'info');
+        } else {
+          alert(aviso);
         }
-        window.renderPanelAdminCUIAG();
+
+        // Si el panel de administración está abierto, recargarlo
+        if (typeof window.renderPanelAdminCUIAG === 'function') {
+          window.renderPanelAdminCUIAG();
+        }
+
+        // Si el modal rápido está abierto, actualizarlo o cerrarlo
+        window.cerrarModalControlRecepcion();
+
+        // Si estamos en index.html y se acaba de cambiar el estado, refrescar vista del cuestionario
+        if (typeof window.abrirCuestionarioEstudiantes === 'function' && !document.getElementById('cuiagAdminPanelContent')) {
+          window.abrirCuestionarioEstudiantes();
+        }
+      } else {
+        const err = await res.json();
+        alert('Error: ' + (err.error || 'No fue posible cambiar el estado.'));
       }
     } catch (e) {
-      alert('Error al actualizar configuración: ' + e.message);
+      alert('Error de conexión al actualizar configuración: ' + e.message);
+    }
+  };
+
+  // Modal rápido de control de recepción (accesible desde cualquier pantalla)
+  window.abrirModalControlRecepcion = async function () {
+    let cont = document.getElementById('cuiagModalControlContainer');
+    if (!cont) {
+      cont = document.createElement('div');
+      cont.id = 'cuiagModalControlContainer';
+      document.body.appendChild(cont);
+    }
+
+    // Consultar estado actual
+    let estadoActual = { recepcion_activa: true, mensaje: '' };
+    try {
+      const res = await fetch('/api/cuiag/estado');
+      if (res.ok) {
+        estadoActual = await res.json();
+      }
+    } catch (e) {}
+
+    const adminKey = window.adminKey || sessionStorage.getItem('fcs_admin_key');
+    const estaAutenticado = !!adminKey;
+
+    cont.innerHTML = `
+      <div class="cuiag-modal-overlay" id="modalControlRecepcionOverlay" onclick="if(event.target === this) window.cerrarModalControlRecepcion()">
+        <div class="cuiag-modal-dialog">
+          <button type="button" class="cuiag-modal-close-btn" onclick="window.cerrarModalControlRecepcion()" title="Cerrar modal">✕</button>
+
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 1.2rem;">
+            <div style="font-size: 2.2rem;">🛡️</div>
+            <div>
+              <h3 style="font-size: 1.25rem; font-weight: 800; color: var(--text-main); margin: 0;">
+                Control de Recepción de Respuestas
+              </h3>
+              <p style="font-size: 0.82rem; color: var(--text-muted); margin: 2px 0 0 0;">
+                Cuestionario CUIAG-CIS • FACSA - UJED
+              </p>
+            </div>
+          </div>
+
+          <!-- ESTADO ACTUAL -->
+          <div style="background: ${estadoActual.recepcion_activa ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)'}; border: 1px solid ${estadoActual.recepcion_activa ? '#10b981' : '#ef4444'}; border-radius: 12px; padding: 1.2rem; margin-bottom: 1.5rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+              <span style="font-size: 0.82rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Estado Actual:</span>
+              <span class="cuiag-reception-badge ${estadoActual.recepcion_activa ? 'active' : 'closed'}">
+                ${estadoActual.recepcion_activa ? '🟢 Recepción Abierta' : '🔴 Recepción Cerrada'}
+              </span>
+            </div>
+            <p style="font-size: 0.88rem; color: var(--text-main); margin: 8px 0 0; line-height: 1.5;">
+              ${estadoActual.recepcion_activa 
+                ? 'El cuestionario está activo y recibiendo respuestas de los alumnos.' 
+                : 'El cuestionario está cerrado. Los alumnos ven una pantalla institucional indicando que ya no se reciben respuestas.'}
+            </p>
+          </div>
+
+          ${!estaAutenticado ? `
+            <div id="modalAuthSection" style="margin-bottom: 1.2rem;">
+              <label style="display: block; font-size: 0.84rem; font-weight: 700; color: var(--text-muted); margin-bottom: 6px;">
+                Ingrese la contraseña de Investigador / Administrador:
+              </label>
+              <div style="display: flex; gap: 8px;">
+                <input type="password" id="inputModalAdminKey" placeholder="••••••••" style="flex: 1; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-main); font-size: 0.95rem; outline: none;">
+                <button type="button" class="cuiag-btn cuiag-btn-gold" onclick="window.autenticarModalRapido()" style="padding: 10px 16px; font-weight: 700;">
+                  Verificar
+                </button>
+              </div>
+              <div id="errModalAuth" style="display: none; color: #f87171; font-size: 0.82rem; font-weight: 600; margin-top: 6px;"></div>
+            </div>
+          ` : `
+            <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 1.5rem;">
+              ${estadoActual.recepcion_activa ? `
+                <button type="button" class="cuiag-btn cuiag-btn-danger" onclick="window.toggleEstadoRecepcionCUIAG(false)" style="width: 100%; justify-content: center; padding: 13px; font-size: 0.96rem; font-weight: 800;">
+                  🛑 Cerrar Recepción de Respuestas (Ya no recibir respuestas)
+                </button>
+              ` : `
+                <button type="button" class="cuiag-btn cuiag-btn-success" onclick="window.toggleEstadoRecepcionCUIAG(true)" style="width: 100%; justify-content: center; padding: 13px; font-size: 0.96rem; font-weight: 800;">
+                  ▶️ Reabrir Recepción de Respuestas
+                </button>
+              `}
+            </div>
+          `}
+
+          <div style="padding-top: 1.2rem; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <a href="admin.html" class="cuiag-btn cuiag-btn-secondary" style="font-size: 0.82rem; text-decoration: none;">
+              📊 Ir al Panel Administrativo Completo ➡️
+            </a>
+            <button type="button" class="cuiag-btn cuiag-btn-secondary" onclick="window.cerrarModalControlRecepcion()" style="font-size: 0.82rem;">
+              Cerrar
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const inp = document.getElementById('inputModalAdminKey');
+    if (inp) {
+      inp.focus();
+      inp.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') window.autenticarModalRapido();
+      });
+    }
+  };
+
+  window.cerrarModalControlRecepcion = function () {
+    const cont = document.getElementById('cuiagModalControlContainer');
+    if (cont) cont.innerHTML = '';
+  };
+
+  window.autenticarModalRapido = async function () {
+    const inp = document.getElementById('inputModalAdminKey');
+    const err = document.getElementById('errModalAuth');
+    const clave = inp ? inp.value.trim() : '';
+    if (!clave) return;
+
+    try {
+      const res = await fetch('/api/cuiag/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clave })
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        window.adminKey = data.key || clave;
+        window.rolActual = data.rol || 'superadmin';
+        sessionStorage.setItem('fcs_admin_key', window.adminKey);
+        sessionStorage.setItem('fcs_rol', window.rolActual);
+        window.abrirModalControlRecepcion();
+      } else {
+        if (err) {
+          err.textContent = '❌ ' + (data.error || 'Contraseña incorrecta.');
+          err.style.display = 'block';
+        }
+      }
+    } catch (e) {
+      if (err) {
+        err.textContent = '❌ Error de conexión: ' + e.message;
+        err.style.display = 'block';
+      }
     }
   };
 

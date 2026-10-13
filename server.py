@@ -117,12 +117,29 @@ def inicializar_bd():
         uso_ia_academico TEXT NOT NULL,
         herramientas_ia TEXT NOT NULL,
         frecuencia_uso TEXT NOT NULL,
+        tipo_version_ia TEXT DEFAULT '',
+        paga_suscripcion_ia TEXT DEFAULT '',
+        versiones_pago_ia TEXT DEFAULT '[]',
+        tiempo_uso_ia TEXT DEFAULT '',
         {columnas_items},
         version_instrumento TEXT NOT NULL,
         estado TEXT NOT NULL DEFAULT 'completado',
         token_envio TEXT UNIQUE NOT NULL
     )
     """)
+
+    # Migración de columnas de preguntas complementarias para bases de datos ya existentes
+    cursor.execute("PRAGMA table_info(cuiag_respuestas)")
+    columnas_existentes = {row[1] for row in cursor.fetchall()}
+    cols_complementarias = [
+        ("tipo_version_ia", "TEXT DEFAULT ''"),
+        ("paga_suscripcion_ia", "TEXT DEFAULT ''"),
+        ("versiones_pago_ia", "TEXT DEFAULT '[]'"),
+        ("tiempo_uso_ia", "TEXT DEFAULT ''")
+    ]
+    for col_nom, col_def in cols_complementarias:
+        if col_nom not in columnas_existentes:
+            cursor.execute(f"ALTER TABLE cuiag_respuestas ADD COLUMN {col_nom} {col_def}")
 
     # Tabla de configuración administrativa
     cursor.execute("""
@@ -427,17 +444,34 @@ class FACSAHTTPHandler(SimpleHTTPRequestHandler):
                 self._responder_json(422, {"error": f"Falta responder el reactivo obligatorio {i}."})
                 return
 
+        # Campos de preguntas complementarias de IA
+        tipo_version = str(datos.get('tipo_version_ia', '')).strip()[:150]
+        paga_suscripcion = str(datos.get('paga_suscripcion_ia', '')).strip()[:150]
+        versiones_pago = datos.get('versiones_pago_ia', [])
+        if not isinstance(versiones_pago, list):
+            versiones_pago = []
+        versiones_pago_str = json.dumps([str(v)[:80] for v in versiones_pago[:15]], ensure_ascii=False)
+        tiempo_uso = str(datos.get('tiempo_uso_ia', '')).strip()[:100]
+
         # 6. Almacenamiento seguro y anónimo mediante consulta parametrizada
         id_tecnico = f"CUIAG-{uuid.uuid4().hex[:12].upper()}"
         timestamp = datetime.now().isoformat()
         version = VERSION_INSTRUMENTO
 
-        columnas = ["id", "timestamp", "carrera", "edad", "uso_ia_academico", "herramientas_ia", "frecuencia_uso"]
+        columnas = [
+            "id", "timestamp", "carrera", "edad", "uso_ia_academico",
+            "herramientas_ia", "frecuencia_uso",
+            "tipo_version_ia", "paga_suscripcion_ia", "versiones_pago_ia", "tiempo_uso_ia"
+        ]
         columnas.extend([f"item_{i}" for i in range(1, 41)])
         columnas.extend(["version_instrumento", "estado", "token_envio"])
 
         placeholders = ", ".join(["?"] * len(columnas))
-        valores = [id_tecnico, timestamp, carrera, edad, uso_ia, herramientas_str, frecuencia]
+        valores = [
+            id_tecnico, timestamp, carrera, edad, uso_ia,
+            herramientas_str, frecuencia,
+            tipo_version, paga_suscripcion, versiones_pago_str, tiempo_uso
+        ]
         valores.extend(valores_items)
         valores.extend([version, "completado", token_envio])
 
@@ -571,10 +605,11 @@ class FACSAHTTPHandler(SimpleHTTPRequestHandler):
             output = io.StringIO()
             writer = csv.writer(output, quoting=csv.QUOTE_MINIMAL)
 
-            # Encabezados: Datos generales + 40 reactivos originales + 4 reactivos recodificados + puntuaciones de dimensión
+            # Encabezados: Datos generales + Preguntas complementarias IA + 40 reactivos originales + 4 reactivos recodificados + puntuaciones de dimensión
             encabezados = [
                 "id_tecnico", "fecha_hora", "carrera", "edad",
-                "uso_ia_academico", "herramientas_ia", "frecuencia_general_uso",
+                "uso_ia_academico", "frecuencia_general_uso",
+                "herramientas_ia", "tipo_version_ia", "paga_suscripcion_ia", "versiones_pago_ia", "tiempo_uso_ia",
                 "version_instrumento", "estado"
             ]
             # Reactivos originales (1 al 40)
@@ -587,9 +622,15 @@ class FACSAHTTPHandler(SimpleHTTPRequestHandler):
             writer.writerow(encabezados)
 
             for f in filas:
+                f_keys = f.keys()
                 fila_csv = [
                     f["id"], f["timestamp"], f["carrera"], f["edad"],
-                    f["uso_ia_academico"], f["herramientas_ia"], f["frecuencia_uso"],
+                    f["uso_ia_academico"], f["frecuencia_uso"],
+                    f["herramientas_ia"],
+                    f["tipo_version_ia"] if "tipo_version_ia" in f_keys else "",
+                    f["paga_suscripcion_ia"] if "paga_suscripcion_ia" in f_keys else "",
+                    f["versiones_pago_ia"] if "versiones_pago_ia" in f_keys else "[]",
+                    f["tiempo_uso_ia"] if "tiempo_uso_ia" in f_keys else "",
                     f["version_instrumento"], f["estado"]
                 ]
                 # Valores originales de reactivos (1 a 40)
@@ -671,14 +712,19 @@ class FACSAHTTPHandler(SimpleHTTPRequestHandler):
             ]
             writer.writerow(encabezados)
 
-            # Variables demográficas
+            # Variables demográficas y generales
             writer.writerow(["id_tecnico", "-", "Identificador", "Identificador técnico aleatorio", "No", "Texto (UUID)", "Único", "Sin recodificación", "Anónimo, sin datos personales"])
             writer.writerow(["fecha_hora", "-", "Registro", "Fecha y hora de envío", "No", "Fecha/Hora ISO-8601", "Variable", "Sin recodificación", "Marca temporal"])
             writer.writerow(["carrera", "-", "Datos Generales", "Licenciatura en la que está inscrito el estudiante", "No", "Texto categórico", "1=Medicina, 2=Psicología, 3=Nutrición", "Sin recodificación", "Último semestre"])
             writer.writerow(["edad", "-", "Datos Generales", "Edad cumplida en años", "No", "Numérico entero", "17 a 99", "Sin recodificación", "Años cumplidos"])
             writer.writerow(["uso_ia_academico", "-", "Datos Generales", "¿Has utilizado herramientas de IA generativa con fines académicos?", "No", "Dicotómica", "1=Sí, 2=No", "Sin recodificación", "Filtro descriptivo"])
-            writer.writerow(["herramientas_ia", "-", "Datos Generales", "Herramientas de IA generativa utilizadas", "No", "Texto (JSON)", "ChatGPT, Gemini, Copilot, Otras", "Sin recodificación", "Respuesta múltiple"])
-            writer.writerow(["frecuencia_general_uso", "-", "Datos Generales", "Frecuencia general con la que utiliza IA generativa", "No", "Ordinal", "1=Nunca, 2=Rara vez, 3=Algunas veces, 4=Frecuentemente, 5=Muy frecuentemente", "Sin recodificación", "5 puntos"])
+            writer.writerow(["frecuencia_general_uso", "-", "Datos Generales", "Frecuencia general con la que utiliza IA generativa", "No", "Ordinal", "1=Nunca, 2=Rara vez, 3=Algunas veces, 4=Frecuentemente, 5=Muy frecuentemente", "Sin recodificación", "Escala de 5 puntos"])
+            # Variables de Preguntas Complementarias sobre IA
+            writer.writerow(["herramientas_ia", "-", "Preguntas Complementarias IA", "¿Cuáles herramientas de IA generativa utilizas con fines académicos?", "No", "Texto (JSON)", "ChatGPT, Google Gemini, Microsoft Copilot, Claude, Perplexity AI, DeepSeek, Otras, No utilizo", "Sin recodificación", "Respuesta múltiple"])
+            writer.writerow(["tipo_version_ia", "-", "Preguntas Complementarias IA", "¿Qué tipo de versión utilizas habitualmente de las herramientas de IA generativa?", "No", "Categórica", "Exclusivamente gratuitas, Principalmente gratuitas, Ambas con frecuencia, Principalmente de pago, Exclusivamente de pago, No estoy seguro(a)", "Sin recodificación", "Selección única"])
+            writer.writerow(["paga_suscripcion_ia", "-", "Preguntas Complementarias IA", "¿Pagas personalmente alguna suscripción para utilizar herramientas de IA generativa?", "No", "Categórica", "Sí, No (solo gratuitas), No personalmente (tercero/institución), No estoy seguro(a)", "Sin recodificación", "Selección única"])
+            writer.writerow(["versiones_pago_ia", "-", "Preguntas Complementarias IA", "Si utilizas versiones de pago, ¿cuáles?", "No", "Texto (JSON)", "ChatGPT Plus/Pro, Google AI Pro/Ultra, Copilot suscripción, Claude Pro/Max, Perplexity Pro, Otra, No utilizo, No conozco plan", "Sin recodificación", "Respuesta múltiple"])
+            writer.writerow(["tiempo_uso_ia", "-", "Preguntas Complementarias IA", "¿Desde hace cuánto tiempo utilizas herramientas de IA generativa para actividades académicas?", "No", "Ordinal", "Menos de un mes, De 1 a 6 meses, De 7 a 12 meses, Más de un año, No las utilizo con fines académicos", "Sin recodificación", "Selección única"])
 
             # 40 reactivos
             for d in DIMENSIONES_METADATA:
