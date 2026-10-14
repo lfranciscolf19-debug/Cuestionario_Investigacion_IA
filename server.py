@@ -14,9 +14,10 @@ import uuid
 import csv
 import io
 import socket
-from datetime import datetime
-from http.server import HTTPServer, SimpleHTTPRequestHandler
-import urllib.parse
+try:
+    from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
+except ImportError:
+    from http.server import HTTPServer as ThreadingHTTPServer, SimpleHTTPRequestHandler
 from excel_report import generar_excel_cuiag
 import db_adapter
 
@@ -775,7 +776,7 @@ def iniciar_servidor():
 
     inicializar_bd()
     server_address = ('', PORT)
-    httpd = HTTPServer(server_address, FACSAHTTPHandler)
+    httpd = ThreadingHTTPServer(server_address, FACSAHTTPHandler)
     ip_actual = obtener_ip_red()
     print("=" * 68)
     print("  🏛️  FACULTAD DE CIENCIAS DE LA SALUD (FACSA - UJED)")

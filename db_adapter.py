@@ -79,7 +79,7 @@ def obtener_conexion():
             print(f"[DB ADAPTER WARNING] No se pudo conectar a PostgreSQL ({e}). Usando SQLite local de respaldo temporal.", file=sys.stderr)
 
     # SQLite Local de respaldo
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30.0)
     conn.row_factory = sqlite3.Row
     return conn
 

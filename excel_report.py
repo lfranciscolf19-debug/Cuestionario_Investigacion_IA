@@ -78,7 +78,7 @@ def generar_excel_cuiag(db_path=None):
         filas = db_adapter.obtener_todas_las_respuestas()
     except Exception as e:
         if db_path and os.path.exists(db_path):
-            conn = sqlite3.connect(db_path)
+            conn = sqlite3.connect(db_path, timeout=30.0)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM cuiag_respuestas ORDER BY timestamp DESC")
