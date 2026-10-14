@@ -137,7 +137,12 @@ class FACSAHTTPHandler(SimpleHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type, X-FACSA-Role, X-FACSA-Key')
         self.end_headers()
-        self.wfile.write(json.dumps(datos, ensure_ascii=False).encode('utf-8'))
+        import decimal
+        def json_serial(obj):
+            if isinstance(obj, decimal.Decimal):
+                return float(obj)
+            return str(obj)
+        self.wfile.write(json.dumps(datos, ensure_ascii=False, default=json_serial).encode('utf-8'))
 
     def _es_autorizado_admin(self):
         """Verifica que la petición provenga de un usuario administrativo con clave válida."""
@@ -461,9 +466,9 @@ class FACSAHTTPHandler(SimpleHTTPRequestHandler):
             # Promedio de edad
             cursor.execute(db_adapter.adaptar_sql("SELECT AVG(edad), MIN(edad), MAX(edad) FROM cuiag_respuestas"))
             fila_edad = cursor.fetchone()
-            promedio_edad = round(fila_edad[0] or 0, 1)
-            min_edad = fila_edad[1] or 0
-            max_edad = fila_edad[2] or 0
+            promedio_edad = round(float(fila_edad[0] or 0), 1)
+            min_edad = int(fila_edad[1] or 0)
+            max_edad = int(fila_edad[2] or 0)
 
             # Frecuencias y porcentajes para cada uno de los 40 reactivos
             frecuencias_items = {}
@@ -485,7 +490,7 @@ class FACSAHTTPHandler(SimpleHTTPRequestHandler):
 
                 # Cálculo de media aritmética descriptiva del reactivo
                 cursor.execute(db_adapter.adaptar_sql(f"SELECT AVG({col}) FROM cuiag_respuestas"))
-                media = round(cursor.fetchone()[0] or 0, 2)
+                media = round(float(cursor.fetchone()[0] or 0), 2)
 
                 frecuencias_items[i] = {
                     "enunciado": ENUNCIADOS_ITEMS.get(i, ""),
