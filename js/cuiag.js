@@ -380,12 +380,7 @@
           </p>
         </div>
 
-        <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 12px; padding: 1.1rem 1.3rem; margin: 1.6rem 0; font-size: 0.92rem; color: #a7f3d0; display: flex; align-items: center; gap: 12px; line-height: 1.5;">
-          <span style="font-size: 1.5rem; flex-shrink: 0;">ℹ️</span>
-          <span>Al presionar el botón <strong>Continuar</strong>, usted confirma su conformidad para participar voluntariamente en esta investigación de manera 100% anónima y confidencial.</span>
-        </div>
-
-        <div class="cuiag-nav-footer">
+        <div class="cuiag-nav-footer" style="margin-top: 2rem;">
           <button type="button" class="cuiag-btn cuiag-btn-secondary" id="btnAtrasPaso1">
             ⬅️ Anterior
           </button>
