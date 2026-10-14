@@ -370,29 +370,19 @@
           <div class="cuiag-section-badge">Requisito Ético Fundamental</div>
           <h2 class="cuiag-section-title">Consentimiento Informado</h2>
           <p class="cuiag-section-desc">
-            Por favor lea atentamente el texto normativo y confirme su decisión de participar.
+            Por favor lea atentamente el texto normativo antes de comenzar.
           </p>
         </div>
 
         <div class="cuiag-consent-box">
-          <p style="margin: 0; font-style: italic;">
+          <p style="margin: 0; font-style: italic; line-height: 1.7; font-size: 0.96rem;">
             "Su participación en este cuestionario es anónima. La información será utilizada con fines académicos y de investigación, conforme al protocolo autorizado y al aviso de privacidad aplicable. La aplicación del cuestionario se realizará únicamente después de obtener las autorizaciones institucionales y el consentimiento informado correspondiente."
           </p>
         </div>
 
-        <div class="cuiag-consent-options">
-          <label class="cuiag-consent-choice ${CUIAG_STATE.consentimientoAceptado === true ? 'selected' : ''}" id="choiceConsentAcepto">
-            <input type="radio" name="consentimientoRadio" value="acepto" ${CUIAG_STATE.consentimientoAceptado === true ? 'checked' : ''}>
-            <span>✅ Acepto participar voluntariamente.</span>
-          </label>
-          <label class="cuiag-consent-choice ${CUIAG_STATE.consentimientoAceptado === false ? 'selected' : ''}" id="choiceConsentRechazo">
-            <input type="radio" name="consentimientoRadio" value="no_acepto" ${CUIAG_STATE.consentimientoAceptado === false ? 'checked' : ''}>
-            <span>❌ No acepto participar.</span>
-          </label>
-        </div>
-
-        <div id="alertErrorConsentimiento" style="display: none; margin-top: 1.2rem; padding: 10px 14px; background: rgba(239, 68, 68, 0.15); border: 1px solid #ef4444; border-radius: 8px; color: #f87171; font-size: 0.88rem; font-weight: 700;">
-          ⚠️ Por favor seleccione una de las dos opciones para continuar.
+        <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 12px; padding: 1.1rem 1.3rem; margin: 1.6rem 0; font-size: 0.92rem; color: #a7f3d0; display: flex; align-items: center; gap: 12px; line-height: 1.5;">
+          <span style="font-size: 1.5rem; flex-shrink: 0;">ℹ️</span>
+          <span>Al presionar el botón <strong>Continuar</strong>, usted confirma su conformidad para participar voluntariamente en esta investigación de manera 100% anónima y confidencial.</span>
         </div>
 
         <div class="cuiag-nav-footer">
@@ -916,40 +906,14 @@
     }
 
     // Paso 1: Consentimiento
-    const rAcepto = document.getElementById('choiceConsentAcepto');
-    const rRechazo = document.getElementById('choiceConsentRechazo');
-    if (rAcepto && rRechazo) {
-      rAcepto.addEventListener('click', () => {
-        CUIAG_STATE.consentimientoAceptado = true;
-        rAcepto.classList.add('selected');
-        rRechazo.classList.remove('selected');
-        document.getElementById('alertErrorConsentimiento').style.display = 'none';
-      });
-      rRechazo.addEventListener('click', () => {
-        CUIAG_STATE.consentimientoAceptado = false;
-        rRechazo.classList.add('selected');
-        rAcepto.classList.remove('selected');
-        document.getElementById('alertErrorConsentimiento').style.display = 'none';
-      });
-    }
-
     const btnA1 = document.getElementById('btnAtrasPaso1');
     if (btnA1) btnA1.addEventListener('click', () => { CUIAG_STATE.pasoActual = 0; renderizarPasoActual(); });
 
     const btnC1 = document.getElementById('btnContinuarPaso1');
     if (btnC1) {
       btnC1.addEventListener('click', () => {
-        if (CUIAG_STATE.consentimientoAceptado === null) {
-          const err = document.getElementById('alertErrorConsentimiento');
-          if (err) err.style.display = 'block';
-          return;
-        }
-        if (CUIAG_STATE.consentimientoAceptado === false) {
-          CUIAG_STATE.pasoActual = 99; // Pantalla respetuosa de finalización
-          renderizarPasoActual();
-          return;
-        }
-        CUIAG_STATE.pasoActual = 2; // Avanzar a datos generales
+        CUIAG_STATE.consentimientoAceptado = true;
+        CUIAG_STATE.pasoActual = 2; // Avanzar directo a datos generales
         renderizarPasoActual();
       });
     }
