@@ -520,17 +520,6 @@ class FACSAHTTPHandler(SimpleHTTPRequestHandler):
             config = dict(cursor.fetchall())
             conn.close()
 
-            self._responder_json(200, {
-                "ok": True,
-                "total_completados": total,
-                "version_instrumento": VERSION_INSTRUMENTO,
-                "carreras": por_carrera,
-                "uso_ia": por_uso_ia,
-                "frecuencias_uso": por_frecuencia,
-                "edad_stats": {
-                    "promedio": promedio_edad,
-                    "min": min_edad,
-                    "max": max_edad
             host_header = self.headers.get('Host', '')
             proto_header = self.headers.get('X-Forwarded-Proto', 'https' if 'onrender.com' in host_header else 'http')
             if 'onrender.com' in host_header or os.environ.get('RENDER_EXTERNAL_URL'):
