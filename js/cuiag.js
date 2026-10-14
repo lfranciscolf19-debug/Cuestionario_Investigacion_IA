@@ -1592,7 +1592,14 @@
     const items = data.items || {};
     const respuestasLista = data.respuestas_lista || [];
 
-    const urlAlumnos = data.url_alumnos || `${window.location.protocol}//${window.location.hostname}:8080/`;
+    let urlAlumnos = data.url_alumnos;
+    if (!urlAlumnos || urlAlumnos.includes('10.28.') || urlAlumnos.includes('10.0.') || urlAlumnos.includes(':10000')) {
+      if (window.location.hostname.includes('onrender.com')) {
+        urlAlumnos = `${window.location.origin}/`;
+      } else {
+        urlAlumnos = `${window.location.protocol}//${window.location.hostname}:8080/`;
+      }
+    }
 
     let html = `
       <div class="cuiag-admin-container">

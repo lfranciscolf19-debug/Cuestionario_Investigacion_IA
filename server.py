@@ -531,11 +531,29 @@ class FACSAHTTPHandler(SimpleHTTPRequestHandler):
                     "promedio": promedio_edad,
                     "min": min_edad,
                     "max": max_edad
+            host_header = self.headers.get('Host', '')
+            proto_header = self.headers.get('X-Forwarded-Proto', 'https' if 'onrender.com' in host_header else 'http')
+            if 'onrender.com' in host_header or os.environ.get('RENDER_EXTERNAL_URL'):
+                url_alumnos_calculada = os.environ.get('RENDER_EXTERNAL_URL', f"{proto_header}://{host_header}").rstrip('/') + '/'
+            else:
+                url_alumnos_calculada = f"http://{obtener_ip_red()}:{PORT}/"
+
+            self._responder_json(200, {
+                "ok": True,
+                "total_completados": total,
+                "version_instrumento": VERSION_INSTRUMENTO,
+                "carreras": por_carrera,
+                "uso_ia": por_uso_ia,
+                "frecuencias_uso": por_frecuencia,
+                "edad_stats": {
+                    "promedio": promedio_edad,
+                    "min": min_edad,
+                    "max": max_edad
                 },
                 "items": frecuencias_items,
                 "dimensiones": DIMENSIONES_METADATA,
                 "ip_local": obtener_ip_red(),
-                "url_alumnos": f"http://{obtener_ip_red()}:{PORT}/",
+                "url_alumnos": url_alumnos_calculada,
                 "config": {
                     "recepcion_activa": config.get("recepcion_activa", "1") == "1",
                     "aprobacion_institucional": config.get("confirmacion_aprobacion_institucional", "1") == "1",
