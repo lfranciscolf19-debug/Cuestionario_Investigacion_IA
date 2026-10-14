@@ -51,14 +51,15 @@ def obtener_tipo_bd():
 def obtener_conexion():
     """
     Retorna una conexión a la base de datos adecuada.
-    Si está en Postgres, retorna conexión psycopg2/pg8000.
-    Si está en local o falla Postgres, retorna conexión sqlite3.
+    Si está en Postgres y conecta exitosamente, retorna conexión psycopg2/pg8000.
+    Si falla o no hay DATABASE_URL, retorna conexión sqlite3 de respaldo seguro.
     """
     if es_postgres():
         try:
             if _DRIVER_POSTGRES == 'psycopg2':
                 import psycopg2
-                conn = psycopg2.connect(DATABASE_URL)
+                import psycopg2.extras
+                conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.DictCursor)
                 conn.autocommit = False
                 return conn
             elif _DRIVER_POSTGRES == 'pg8000':
@@ -75,30 +76,31 @@ def obtener_conexion():
                 conn.autocommit = False
                 return conn
         except Exception as e:
-            print(f"[DB ADAPTER WARNING] No se pudo conectar a PostgreSQL: {e}. Usando SQLite local de respaldo.")
+            print(f"[DB ADAPTER WARNING] No se pudo conectar a PostgreSQL ({e}). Usando SQLite local de respaldo temporal.", file=sys.stderr)
 
-    # SQLite Local
+    # SQLite Local de respaldo
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
 
-def adaptar_sql(sql):
+def adaptar_sql(sql, conn=None):
     """
     Adapta la sintaxis SQL entre SQLite y PostgreSQL:
-    - Marcadores de posición: '?' -> '%s'
-    - Conflictos: INSERT OR IGNORE -> ON CONFLICT DO NOTHING
-    - Conflictos: INSERT OR REPLACE -> ON CONFLICT DO UPDATE
+    - Si la conexión activa es SQLite: no modifica '?' ni clausulas SQLite.
+    - Si es PostgreSQL: '?' -> '%s', ON CONFLICT, etc.
     """
-    if not es_postgres():
+    es_sqlite = False
+    if conn is not None:
+        es_sqlite = isinstance(conn, sqlite3.Connection)
+    else:
+        es_sqlite = not es_postgres()
+
+    if es_sqlite:
         return sql
 
-    adaptada = sql
+    adaptada = sql.replace('?', '%s')
 
-    # Reemplazo de marcadores de posición
-    adaptada = adaptada.replace('?', '%s')
-
-    # INSERT OR IGNORE INTO cuiag_config (clave, valor) VALUES (%s, %s)
     if 'INSERT OR IGNORE INTO cuiag_config' in adaptada:
         adaptada = adaptada.replace(
             'INSERT OR IGNORE INTO cuiag_config',
@@ -107,7 +109,6 @@ def adaptar_sql(sql):
         if 'ON CONFLICT' not in adaptada:
             adaptada += ' ON CONFLICT (clave) DO NOTHING'
 
-    # INSERT OR REPLACE INTO cuiag_config
     if 'INSERT OR REPLACE INTO cuiag_config' in adaptada:
         adaptada = adaptada.replace(
             'INSERT OR REPLACE INTO cuiag_config',
@@ -120,11 +121,12 @@ def adaptar_sql(sql):
 
 
 def inicializar_bd():
-    """Crea las tablas en PostgreSQL o SQLite si no existen."""
+    """Crea las tablas en PostgreSQL o SQLite si no existen de forma segura."""
     columnas_items = ", ".join([f"item_{i} INTEGER NOT NULL" for i in range(1, 41)])
 
     conn = obtener_conexion()
     cursor = conn.cursor()
+    es_sqlite = isinstance(conn, sqlite3.Connection)
 
     try:
         # Tabla de respuestas CUIAG-CIS
@@ -146,10 +148,10 @@ def inicializar_bd():
             estado VARCHAR(32) NOT NULL DEFAULT 'completado',
             token_envio VARCHAR(128) UNIQUE NOT NULL
         )
-        """))
+        """, conn=conn))
 
         # Columnas complementarias (migración automática)
-        if not es_postgres():
+        if es_sqlite:
             cursor.execute("PRAGMA table_info(cuiag_respuestas)")
             columnas_existentes = {row[1] for row in cursor.fetchall()}
             cols_comp = [
@@ -184,7 +186,7 @@ def inicializar_bd():
             clave VARCHAR(64) PRIMARY KEY,
             valor TEXT NOT NULL
         )
-        """))
+        """, conn=conn))
 
         # Valores iniciales de configuración
         config_defaults = {
@@ -193,7 +195,7 @@ def inicializar_bd():
             "mensaje_inactivo": "La recepción de respuestas se encuentra actualmente pausada por el comité de investigación."
         }
         for k, v in config_defaults.items():
-            if es_postgres():
+            if not es_sqlite:
                 cursor.execute("""
                 INSERT INTO cuiag_config (clave, valor) VALUES (%s, %s)
                 ON CONFLICT (clave) DO NOTHING
@@ -210,13 +212,14 @@ def inicializar_bd():
             accion VARCHAR(128) NOT NULL,
             detalle TEXT NOT NULL
         )
-        """))
+        """, conn=conn))
 
         conn.commit()
-        print(f"[DB ADAPTER] Base de datos inicializada correctamente: {obtener_tipo_bd()}")
+        tipo_msg = "SQLite Local (respaldo)" if es_sqlite else f"PostgreSQL ({_DRIVER_POSTGRES})"
+        print(f"[DB ADAPTER] Base de datos inicializada correctamente en: {tipo_msg}")
     except Exception as e:
         conn.rollback()
-        print(f"[DB ADAPTER ERROR] Error al inicializar base de datos: {e}")
+        print(f"[DB ADAPTER ERROR] Error al inicializar base de datos: {e}", file=sys.stderr)
         raise e
     finally:
         conn.close()
@@ -226,11 +229,11 @@ def ejecutar_consulta(sql, params=None, fetch='none'):
     """
     Ejecuta una consulta SQL adaptada de forma segura.
     fetch: 'none', 'one', 'all'
-    Retorna resultados como diccionarios o tuplas legibles.
+    Retorna resultados como diccionarios legibles.
     """
     conn = obtener_conexion()
     cursor = conn.cursor()
-    sql_adaptada = adaptar_sql(sql)
+    sql_adaptada = adaptar_sql(sql, conn=conn)
 
     try:
         if params:
