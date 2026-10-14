@@ -447,11 +447,6 @@
             <li>Agradecemos la colaboración de los estudiantes de Medicina, Psicología y Nutrición de la FACSA · UJED.</li>
           </ul>
         </div>
-        <div style="margin-top: 2rem; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
-          <button type="button" class="cuiag-btn cuiag-btn-secondary" onclick="window.abrirModalControlRecepcion()">
-            ⚙️ Control / Acceso de Investigador
-          </button>
-        </div>
       </div>
     `;
   }
