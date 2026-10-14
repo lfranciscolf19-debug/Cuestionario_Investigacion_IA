@@ -280,3 +280,48 @@ def ejecutar_consulta(sql, params=None, fetch='none'):
 def obtener_todas_las_respuestas():
     """Retorna todas las respuestas registradas ordenadas por timestamp desc como lista de diccionarios."""
     return ejecutar_consulta("SELECT * FROM cuiag_respuestas ORDER BY timestamp DESC", fetch='all') or []
+
+
+def obtener_resumen_respuestas():
+    """Retorna lista resumida de respuestas (sin los 40 reactivos) para visualización en panel administrativo."""
+    sql = """
+    SELECT id, timestamp, carrera, edad, uso_ia_academico, herramientas_ia, frecuencia_uso, tipo_version_ia, tiempo_uso_ia, version_instrumento, estado 
+    FROM cuiag_respuestas 
+    ORDER BY timestamp DESC
+    """
+    return ejecutar_consulta(sql, fetch='all') or []
+
+
+def eliminar_respuesta_por_id(id_respuesta):
+    """Elimina una respuesta específica por su ID. Retorna la cantidad de filas afectadas."""
+    conn = obtener_conexion()
+    cursor = conn.cursor()
+    try:
+        sql = adaptar_sql("DELETE FROM cuiag_respuestas WHERE id = ?", conn=conn)
+        cursor.execute(sql, (id_respuesta,))
+        filas = cursor.rowcount
+        conn.commit()
+        return filas
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+
+
+def vaciar_todas_las_respuestas():
+    """Elimina todas las respuestas registradas. Retorna la cantidad de filas eliminadas."""
+    conn = obtener_conexion()
+    cursor = conn.cursor()
+    try:
+        sql = adaptar_sql("DELETE FROM cuiag_respuestas", conn=conn)
+        cursor.execute(sql)
+        filas = cursor.rowcount
+        conn.commit()
+        return filas
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+

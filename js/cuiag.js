@@ -1543,12 +1543,15 @@
 
     try {
       const adminKey = window.adminKey || sessionStorage.getItem('fcs_admin_key') || '';
-      const res = await fetch('/api/cuiag/admin/metricas', {
-        headers: {
-          'X-FACSA-Role': window.rolActual || 'superadmin',
-          'X-FACSA-Key': adminKey
-        }
-      });
+      const headers = {
+        'X-FACSA-Role': window.rolActual || 'superadmin',
+        'X-FACSA-Key': adminKey
+      };
+
+      const [res, resLista] = await Promise.all([
+        fetch('/api/cuiag/admin/metricas', { headers }),
+        fetch('/api/cuiag/admin/respuestas-lista', { headers }).catch(() => null)
+      ]);
 
       if (!res.ok) {
         if (res.status === 403) {
@@ -1564,6 +1567,14 @@
       }
 
       const data = await res.json();
+      let respuestasLista = [];
+      if (resLista && resLista.ok) {
+        try {
+          const dataLista = await resLista.json();
+          respuestasLista = dataLista.respuestas || [];
+        } catch (e) {}
+      }
+      data.respuestas_lista = respuestasLista;
       construirHTMLAdminPanel(contenedor, data);
 
     } catch (err) {
@@ -1579,6 +1590,7 @@
     const carreras = data.carreras || {};
     const cfg = data.config || {};
     const items = data.items || {};
+    const respuestasLista = data.respuestas_lista || [];
 
     const urlAlumnos = data.url_alumnos || `${window.location.protocol}//${window.location.hostname}:8080/`;
 
@@ -1806,6 +1818,92 @@
           </div>
         </div>
 
+        <!-- GESTIÓN Y ELIMINACIÓN DE RESPUESTAS -->
+        <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 16px; padding: 1.6rem; margin-bottom: 2rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem; flex-wrap: wrap; gap: 10px;">
+            <div>
+              <h3 style="margin: 0; font-size: 1.2rem; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
+                <span>📋 Gestión de Respuestas Registradas</span>
+                <span class="status-badge" style="background: ${respuestasLista.length > 0 ? '#10b981' : '#64748b'}; color: #fff;">${respuestasLista.length} en base de datos</span>
+              </h3>
+              <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">
+                Permite auditar envíos individuales, eliminar registros de prueba o reiniciar la base de datos a 0 para la aplicación oficial a estudiantes.
+              </div>
+            </div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+              ${respuestasLista.length > 0 ? `
+                <button type="button" class="cuiag-btn cuiag-btn-danger" onclick="window.vaciarTodasLasRespuestas()" style="padding: 7px 14px; font-size: 0.82rem; font-weight: 700;">
+                  ⚠️ Vaciar todas las respuestas (Reinicio a 0)
+                </button>
+              ` : ''}
+              <button type="button" class="cuiag-btn cuiag-btn-secondary" onclick="window.renderPanelAdminCUIAG()" style="padding: 7px 12px; font-size: 0.82rem;" title="Recargar lista">
+                🔄 Actualizar
+              </button>
+            </div>
+          </div>
+
+          ${respuestasLista.length === 0 ? `
+            <div style="background: rgba(16, 185, 129, 0.08); border: 1px dashed rgba(16, 185, 129, 0.35); border-radius: 12px; padding: 2.2rem 1.5rem; text-align: center;">
+              <div style="font-size: 2.4rem; margin-bottom: 8px;">✨</div>
+              <div style="font-weight: 800; font-size: 1.15rem; color: #34d399; margin-bottom: 6px;">
+                Base de datos limpia y lista (0 respuestas registradas)
+              </div>
+              <div style="font-size: 0.86rem; color: var(--text-muted); max-width: 540px; margin: 0 auto; line-height: 1.5;">
+                No hay respuestas de prueba en el sistema. En cuanto los alumnos ingresen y respondan el instrumento, verás aparecer aquí cada envío en tiempo real con su ID anónimo y datos sociodemográficos.
+              </div>
+            </div>
+          ` : `
+            <div style="overflow-x: auto;">
+              <table class="custom-table" style="width: 100%; font-size: 0.84rem;">
+                <thead>
+                  <tr>
+                    <th>Folio / ID</th>
+                    <th>Fecha y Hora</th>
+                    <th>Carrera</th>
+                    <th style="text-align: center;">Edad</th>
+                    <th style="text-align: center;">Uso IA</th>
+                    <th>Frecuencia</th>
+                    <th>Herramientas</th>
+                    <th style="text-align: center; width: 100px;">Acción</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${respuestasLista.map(r => {
+                    let tools = [];
+                    try { tools = JSON.parse(r.herramientas_ia || '[]'); } catch(e) { tools = [r.herramientas_ia || '']; }
+                    const fechaStr = r.timestamp ? new Date(r.timestamp).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' }) : '-';
+                    const badgeCarrera = r.carrera === 'Medicina' ? 'background: rgba(56, 189, 248, 0.15); color: #38bdf8;' :
+                                         r.carrera === 'Psicología' ? 'background: rgba(168, 85, 247, 0.15); color: #c084fc;' :
+                                         'background: rgba(74, 222, 128, 0.15); color: #4ade80;';
+                    return `
+                      <tr>
+                        <td style="font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #fbbf24;">${r.id}</td>
+                        <td style="color: var(--text-muted); font-size: 0.8rem;">${fechaStr}</td>
+                        <td><span class="status-badge" style="${badgeCarrera}">${r.carrera || '-'}</span></td>
+                        <td style="text-align: center; font-weight: 700;">${r.edad || '-'}</td>
+                        <td style="text-align: center;">
+                          <span class="status-badge" style="${r.uso_ia_academico === 'Sí' ? 'background: rgba(16, 185, 129, 0.2); color: #34d399;' : 'background: rgba(239, 68, 68, 0.2); color: #f87171;'}">
+                            ${r.uso_ia_academico || '-'}
+                          </span>
+                        </td>
+                        <td>${r.frecuencia_uso || '-'}</td>
+                        <td style="font-size: 0.78rem; color: var(--text-muted); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${tools.join(', ')}">
+                          ${tools.join(', ') || '-'}
+                        </td>
+                        <td style="text-align: center;">
+                          <button type="button" class="cuiag-btn cuiag-btn-danger" onclick="window.eliminarRespuestaIndividual('${r.id}')" style="padding: 4px 10px; font-size: 0.75rem; font-weight: 700;" title="Eliminar esta respuesta permanentemente">
+                            🗑️ Borrar
+                          </button>
+                        </td>
+                      </tr>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          `}
+        </div>
+
         <!-- NOTA DE SEGURIDAD Y PRIVACIDAD -->
         <div style="font-size: 0.78rem; color: var(--text-muted); text-align: center; margin-top: 1.5rem;">
           Facultad de Ciencias de la Salud • UJED • Los datos de investigación son tratados con anonimato estricto y no generan calificaciones ni créditos académicos.
@@ -1820,13 +1918,103 @@
     contenedor.innerHTML = `
       <div style="padding: 1.5rem; background: var(--card-bg); border-radius: 14px;">
         <h3 style="color: #fbbf24;">🔬 Panel CUIAG-CIS (Modo Local)</h3>
-        <p>Registros en almacenamiento local: <strong>${localResp.length}</strong>.</p>
+        <p>Registros en almacenamiento local del navegador: <strong>${localResp.length}</strong>.</p>
         <p style="font-size: 0.85rem; color: var(--text-muted);">
           Para habilitar el servicio completo de backend con base de datos SQLite y exportación CSV, asegúrese de ejecutar <code>iniciar.bat</code> o <code>python server.py 8080</code>.
         </p>
+        ${localResp.length > 0 ? `
+          <button type="button" class="cuiag-btn cuiag-btn-danger" onclick="window.limpiarRespuestasLocales()" style="padding: 8px 14px; font-size: 0.82rem; margin-top: 10px;">
+            🧹 Borrar Respuestas Locales del Navegador
+          </button>
+        ` : ''}
       </div>
     `;
   }
+
+  // Eliminar una respuesta individual por su ID
+  window.eliminarRespuestaIndividual = async function (id) {
+    if (!confirm(`¿Confirmas que deseas eliminar permanentemente la respuesta "${id}"?\n\nEsta acción quitará el registro de la base de datos de investigación.`)) {
+      return;
+    }
+    const rol = window.rolActual || sessionStorage.getItem('fcs_rol') || 'superadmin';
+    const adminKey = window.adminKey || sessionStorage.getItem('fcs_admin_key') || '';
+
+    try {
+      const res = await fetch('/api/cuiag/admin/eliminar-respuesta', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-FACSA-Role': rol,
+          'X-FACSA-Key': adminKey
+        },
+        body: JSON.stringify({ id })
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        if (typeof mostrarToast === 'function') {
+          mostrarToast('Respuesta eliminada correctamente.', 'success');
+        } else {
+          alert('Respuesta eliminada correctamente.');
+        }
+        if (typeof window.renderPanelAdminCUIAG === 'function') {
+          window.renderPanelAdminCUIAG();
+        }
+      } else {
+        alert('Error: ' + (data.error || 'No se pudo eliminar la respuesta.'));
+      }
+    } catch (err) {
+      alert('Error de conexión al eliminar respuesta: ' + err.message);
+    }
+  };
+
+  // Vaciar todas las respuestas para reiniciar a cero
+  window.vaciarTodasLasRespuestas = async function () {
+    const palabra = prompt('⚠️ ATENCIÓN: Esta acción eliminará TODAS las respuestas registradas en la base de datos para reiniciar el instrumento a 0 antes de su aplicación oficial.\n\nSe creará un respaldo de seguridad automático.\n\nPara confirmar, escribe la palabra VACIAR en mayúsculas:');
+    if (palabra !== 'VACIAR') {
+      if (palabra !== null) alert('Operación cancelada. Debes escribir exactamente la palabra VACIAR.');
+      return;
+    }
+    const rol = window.rolActual || sessionStorage.getItem('fcs_rol') || 'superadmin';
+    const adminKey = window.adminKey || sessionStorage.getItem('fcs_admin_key') || '';
+
+    try {
+      const res = await fetch('/api/cuiag/admin/vaciar-respuestas', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-FACSA-Role': rol,
+          'X-FACSA-Key': adminKey
+        },
+        body: JSON.stringify({ confirmacion: 'VACIAR' })
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        try { localStorage.removeItem('fcs_cuiag_respuestas_local'); } catch(e) {}
+        if (typeof mostrarToast === 'function') {
+          mostrarToast(data.mensaje || 'Base de datos reiniciada a 0.', 'success');
+        } else {
+          alert(data.mensaje || 'Base de datos reiniciada a 0.');
+        }
+        if (typeof window.renderPanelAdminCUIAG === 'function') {
+          window.renderPanelAdminCUIAG();
+        }
+      } else {
+        alert('Error: ' + (data.error || 'No se pudieron vaciar las respuestas.'));
+      }
+    } catch (err) {
+      alert('Error de conexión al vaciar respuestas: ' + err.message);
+    }
+  };
+
+  // Limpiar almacenamiento local fallback
+  window.limpiarRespuestasLocales = function () {
+    if (!confirm('¿Deseas eliminar las respuestas de prueba guardadas localmente en este navegador?')) return;
+    try {
+      localStorage.removeItem('fcs_cuiag_respuestas_local');
+      if (typeof mostrarToast === 'function') mostrarToast('Almacenamiento local limpiado.', 'success');
+      if (typeof window.renderPanelAdminCUIAG === 'function') window.renderPanelAdminCUIAG();
+    } catch(e) {}
+  };
 
   // Descargas de exportación (Excel con Gráficos, CSV, Diccionario)
   window.descargarExportacionCUIAG = function (tipo) {

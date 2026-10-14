@@ -202,6 +202,10 @@ class FACSAHTTPHandler(SimpleHTTPRequestHandler):
             self.manejar_get_auditoria()
             return
 
+        if path == '/api/cuiag/admin/respuestas-lista':
+            self.manejar_get_respuestas_lista()
+            return
+
         if path in ['/admin', '/admin/']:
             self.path = '/admin.html'
 
@@ -225,6 +229,14 @@ class FACSAHTTPHandler(SimpleHTTPRequestHandler):
 
         if path == '/api/cuiag/admin/config':
             self.manejar_post_config()
+            return
+
+        if path == '/api/cuiag/admin/eliminar-respuesta':
+            self.manejar_post_eliminar_respuesta()
+            return
+
+        if path == '/api/cuiag/admin/vaciar-respuestas':
+            self.manejar_post_vaciar_respuestas()
             return
 
         self._responder_json(404, {"error": "Ruta de API no encontrada"})
@@ -767,6 +779,73 @@ class FACSAHTTPHandler(SimpleHTTPRequestHandler):
             self._responder_json(200, {"ok": True, "mensaje": "Configuración del módulo actualizada correctamente."})
         except Exception as e:
             self._responder_json(500, {"error": f"Error al guardar configuración: {str(e)}"})
+
+    def manejar_get_respuestas_lista(self):
+        """Retorna lista de respuestas registradas para visualización y control en el panel administrativo."""
+        if not self._es_autorizado_admin():
+            self._responder_json(403, {"error": "Acceso restringido. Se requiere perfil administrativo."})
+            return
+
+        try:
+            respuestas = db_adapter.obtener_resumen_respuestas()
+            self._responder_json(200, {
+                "ok": True,
+                "total": len(respuestas),
+                "respuestas": respuestas
+            })
+        except Exception as e:
+            self._responder_json(500, {"error": f"Error al consultar lista de respuestas: {str(e)}"})
+
+    def manejar_post_eliminar_respuesta(self):
+        """Elimina una respuesta individual por su ID."""
+        if not self._es_autorizado_admin():
+            self._responder_json(403, {"error": "Acceso restringido. Se requiere perfil administrativo."})
+            return
+
+        try:
+            content_length = int(self.headers.get('Content-Length', 0))
+            body_bytes = self.rfile.read(content_length)
+            datos = json.loads(body_bytes.decode('utf-8')) if body_bytes else {}
+            id_respuesta = str(datos.get('id', '')).strip()
+
+            if not id_respuesta:
+                self._responder_json(400, {"error": "ID de respuesta no especificado."})
+                return
+
+            filas = db_adapter.eliminar_respuesta_por_id(id_respuesta)
+            if filas > 0:
+                rol_actual = self.headers.get('X-FACSA-Role', 'admin')
+                registrar_auditoria_admin(rol_actual, 'Eliminación Individual', f"Eliminada respuesta {id_respuesta}")
+                self._responder_json(200, {"ok": True, "mensaje": f"Respuesta {id_respuesta} eliminada correctamente."})
+            else:
+                self._responder_json(404, {"error": f"No se encontró ninguna respuesta con el ID {id_respuesta}."})
+        except Exception as e:
+            self._responder_json(500, {"error": f"Error al eliminar respuesta: {str(e)}"})
+
+    def manejar_post_vaciar_respuestas(self):
+        """Elimina todas las respuestas registradas (con respaldo de seguridad automático previo)."""
+        if not self._es_autorizado_admin():
+            self._responder_json(403, {"error": "Acceso restringido. Se requiere perfil administrativo."})
+            return
+
+        try:
+            # Respaldo automático antes de vaciar
+            if not db_adapter.es_postgres() and os.path.exists(DB_PATH):
+                backup_nombre = f"cuiag_investigacion_backup_vaciado_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+                backup_ruta = os.path.join(DATA_DIR, backup_nombre)
+                import shutil
+                shutil.copy2(DB_PATH, backup_ruta)
+
+            filas = db_adapter.vaciar_todas_las_respuestas()
+            rol_actual = self.headers.get('X-FACSA-Role', 'admin')
+            registrar_auditoria_admin(rol_actual, 'Vaciado de Respuestas', f"Se eliminaron {filas} respuestas de la base de datos para reinicio de aplicación oficial.")
+            self._responder_json(200, {
+                "ok": True,
+                "mensaje": f"Se han eliminado exitosamente {filas} respuestas. El cuestionario ha quedado en 0 listo para tus alumnos.",
+                "filas_eliminadas": filas
+            })
+        except Exception as e:
+            self._responder_json(500, {"error": f"Error al vaciar respuestas: {str(e)}"})
 
 def iniciar_servidor():
     if hasattr(sys.stdout, 'reconfigure'):
