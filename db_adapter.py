@@ -36,8 +36,14 @@ if DATABASE_URL:
             _DRIVER_POSTGRES = None
 
 
+_POSTGRES_DISPONIBLE = None
+
+
 def es_postgres():
-    """Retorna True si hay DATABASE_URL configurada y driver disponible."""
+    """Retorna True si PostgreSQL está configurado y respondiendo exitosamente."""
+    global _POSTGRES_DISPONIBLE
+    if _POSTGRES_DISPONIBLE is not None:
+        return _POSTGRES_DISPONIBLE
     return bool(DATABASE_URL and _DRIVER_POSTGRES)
 
 
@@ -54,13 +60,15 @@ def obtener_conexion():
     Si está en Postgres y conecta exitosamente, retorna conexión psycopg2/pg8000.
     Si falla o no hay DATABASE_URL, retorna conexión sqlite3 de respaldo seguro.
     """
-    if es_postgres():
+    global _POSTGRES_DISPONIBLE
+    if bool(DATABASE_URL and _DRIVER_POSTGRES):
         try:
             if _DRIVER_POSTGRES == 'psycopg2':
                 import psycopg2
                 import psycopg2.extras
                 conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.DictCursor)
                 conn.autocommit = False
+                _POSTGRES_DISPONIBLE = True
                 return conn
             elif _DRIVER_POSTGRES == 'pg8000':
                 import pg8000.dbapi
@@ -74,11 +82,14 @@ def obtener_conexion():
                     database=url.path.lstrip('/') or 'postgres'
                 )
                 conn.autocommit = False
+                _POSTGRES_DISPONIBLE = True
                 return conn
         except Exception as e:
+            _POSTGRES_DISPONIBLE = False
             print(f"[DB ADAPTER WARNING] No se pudo conectar a PostgreSQL ({e}). Usando SQLite local de respaldo temporal.", file=sys.stderr)
 
     # SQLite Local de respaldo
+    _POSTGRES_DISPONIBLE = False
     conn = sqlite3.connect(DB_PATH, timeout=30.0)
     conn.row_factory = sqlite3.Row
     return conn
