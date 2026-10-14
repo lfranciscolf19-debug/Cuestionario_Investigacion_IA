@@ -432,18 +432,27 @@
   <!-- SCRIPTS DEL CUESTIONARIO -->
   <script src="js/data.js?v=70"></script>
   <script src="js/audio.js?v=70"></script>
-  <script src="js/cuiag.js?v=74"></script>
+  <script src="js/cuiag.js?v=75"></script>
 
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       // 1. Cargar tema
-      const temaGuardado = localStorage.getItem('unicampus_theme') || 'dark';
+      let temaGuardado = 'dark';
+      try {
+        temaGuardado = localStorage.getItem('unicampus_theme') || 'dark';
+      } catch (e) {}
       document.documentElement.setAttribute('data-theme', temaGuardado);
-      actualizarBotonTema(temaGuardado);
+      try {
+        actualizarBotonTema(temaGuardado);
+      } catch (e) {}
 
       // 2. Renderizar el Cuestionario para Estudiantes de inmediato
-      if (typeof window.abrirCuestionarioEstudiantes === 'function') {
-        window.abrirCuestionarioEstudiantes();
+      try {
+        if (typeof window.abrirCuestionarioEstudiantes === 'function') {
+          window.abrirCuestionarioEstudiantes();
+        }
+      } catch (e) {
+        console.error('Error al inicializar cuestionario:', e);
       }
     });
 
@@ -452,7 +461,7 @@
       const actual = document.documentElement.getAttribute('data-theme') || 'dark';
       const nuevo = actual === 'dark' ? 'light' : 'dark';
       document.documentElement.setAttribute('data-theme', nuevo);
-      localStorage.setItem('unicampus_theme', nuevo);
+      try { localStorage.setItem('unicampus_theme', nuevo); } catch (e) {}
       actualizarBotonTema(nuevo);
     };
 
